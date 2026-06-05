@@ -5,6 +5,7 @@ const pool = require('./src/config/database');
 
 // Importar rutas
 const authRoutes = require('./src/routes/authRoutes');
+const reporteRoutes = require('./src/routes/reporteRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
