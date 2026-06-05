@@ -61,4 +61,65 @@ const registrarUsuario = async (req, res) => {
     }
 };
 
-module.exports = { registrarUsuario };
+// ... código previo de registrarUsuario ...
+
+const iniciarSesion = async (req, res) => {
+    const { email, password } = req.body;
+
+    // 1. Validar que se envíen los datos
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Por favor ingresa correo y contraseña' });
+    }
+
+    try {
+        // 2. Buscar al usuario por su correo
+        const query = 'SELECT id, rol_id, password_hash, nombre_completo FROM usuarios WHERE email = $1';
+        const result = await pool.query(query, [email]);
+
+        // Si no existe el correo, devolvemos un error genérico por seguridad
+        if (result.rows.length === 0) {
+            return res.status(401).json({ error: 'Credenciales inválidas' });
+        }
+
+        const usuario = result.rows[0];
+
+        // 3. Comparar la contraseña enviada con el Hash de la base de datos
+        const passwordValida = await bcrypt.compare(password, usuario.password_hash);
+        if (!passwordValida) {
+            return res.status(401).json({ error: 'Credenciales inválidas' });
+        }
+
+        // 4. Si es válida, generamos el Token JWT
+        const payload = {
+            usuario: {
+                id: usuario.id,
+                rol_id: usuario.rol_id
+            }
+        };
+
+        jwt.sign(
+            payload,
+            process.env.JWT_SECRET,
+            { expiresIn: '30d' },
+            (err, token) => {
+                if (err) throw err;
+                res.status(200).json({
+                    mensaje: 'Inicio de sesión exitoso',
+                    token: token,
+                    usuario: {
+                        id: usuario.id,
+                        rol_id: usuario.rol_id,
+                        nombre: usuario.nombre_completo
+                    }
+                });
+            }
+        );
+
+    } catch (error) {
+        console.error('Error en login:', error);
+        res.status(500).json({ error: 'Error interno del servidor al iniciar sesión' });
+    }
+};
+
+// Actualizamos la exportación para incluir ambas funciones
+module.exports = { registrarUsuario, iniciarSesion };
