@@ -74,4 +74,33 @@ const crearReporte = async (req, res) => {
     }
 };
 
-module.exports = { crearReporte };
+const obtenerMisReportes = async (req, res) => {
+    const usuario_id = req.usuario.id;
+
+    try {
+        const query = `
+            SELECT
+                r.id,
+                r.especie,
+                r.color_dominante,
+                r.referencias,
+                ST_Y(r.ubicacion::geometry) AS latitud,
+                ST_X(r.ubicacion::geometry) AS longitud,
+                m.url_archivo AS foto_url
+            FROM reportes r
+            LEFT JOIN reporte_multimedia m
+                ON r.id = m.reporte_id AND m.tipo = 'Foto_Animal'
+            WHERE r.usuario_reportador_id = $1
+            ORDER BY r.id DESC;
+        `;
+
+        const { rows } = await pool.query(query, [usuario_id]);
+
+        return res.status(200).json(rows);
+    } catch (error) {
+        console.error('Error al obtener historial:', error);
+        return res.status(500).json({ error: 'Error interno al cargar el historial' });
+    }
+};
+
+module.exports = { crearReporte, obtenerMisReportes };
