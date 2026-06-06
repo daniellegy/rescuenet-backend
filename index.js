@@ -15,6 +15,7 @@ app.use(express.json());
 
 // Montar rutas
 app.use('/api/auth', authRoutes);
+app.use('/api/reportes', reporteRoutes);
 
 app.get('/api/health', async (req, res) => {
     try {
