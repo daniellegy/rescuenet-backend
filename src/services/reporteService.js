@@ -7,23 +7,32 @@ const crearNuevoReporte = async (usuario_id, body, file) => {
         throw error;
     }
 
-    const { latitud, longitud, especie, color_dominante, referencias } = body;
+    // Extraemos todos los campos nuevos enviados por la app de tu compañero
+    const { 
+        latitud, longitud, especie, color_dominante, 
+        sexo, edad_aprox, tamano, raza_aprox, caracteristicas_especiales, notas_adicionales 
+    } = body;
 
+    // Validación básica
     if (!latitud || !longitud || !especie || !color_dominante) {
         const error = new Error('Faltan datos obligatorios (GPS, especie o color)');
         error.statusCode = 400;
         throw error;
     }
 
-    // Estructuramos los datos para enviarlos al modelo
     const datosReporte = {
         usuario_id,
         latitud,
         longitud,
         especie,
         color_dominante,
-        referencias,
-        url_archivo: file.path // URL pública generada por Cloudinary
+        sexo,
+        edad_aprox,
+        tamano,
+        raza_aprox,
+        caracteristicas_especiales,
+        notas_adicionales,
+        url_archivo: file.path
     };
 
     return await reporteModel.crearReporteConFoto(datosReporte);
