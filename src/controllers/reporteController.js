@@ -4,30 +4,40 @@ const crearReporte = async (req, res) => {
     try {
         const usuario_id = req.usuario.id;
         const resultado = await reporteService.crearNuevoReporte(usuario_id, req.body, req.file);
-
-        return res.status(201).json({
-            mensaje: 'Reporte de rescate creado con éxito',
-            ...resultado
-        });
+        return res.status(201).json({ mensaje: 'Reporte creado', ...resultado });
     } catch (error) {
         const status = error.statusCode || 500;
-        const mensaje = status === 500 ? 'Error interno al procesar el reporte' : error.message;
-        if (status === 500) console.error('Error al guardar reporte:', error);
-        
-        return res.status(status).json({ error: mensaje });
+        return res.status(status).json({ error: error.message || 'Error interno' });
     }
 };
 
 const obtenerMisReportes = async (req, res) => {
     try {
-        const usuario_id = req.usuario.id;
-        const historial = await reporteService.obtenerMisReportes(usuario_id);
-        
+        const historial = await reporteService.obtenerMisReportes(req.usuario.id);
         return res.status(200).json(historial);
     } catch (error) {
-        console.error('Error al obtener historial:', error);
-        return res.status(500).json({ error: 'Error interno al cargar el historial' });
+        return res.status(500).json({ error: 'Error al cargar el historial' });
     }
 };
 
-module.exports = { crearReporte, obtenerMisReportes };
+const obtenerReportesActivos = async (req, res) => {
+    try {
+        const activos = await reporteService.obtenerActivos();
+        return res.status(200).json(activos);
+    } catch (error) {
+        return res.status(500).json({ error: 'Error al cargar reportes activos' });
+    }
+};
+
+const aceptarReporte = async (req, res) => {
+    try {
+        const reporte_id = req.params.id;
+        const voluntario_id = req.usuario.id;
+        await reporteService.aceptarRescate(reporte_id, voluntario_id);
+        return res.status(200).json({ mensaje: 'Rescate aceptado exitosamente' });
+    } catch (error) {
+        return res.status(500).json({ error: 'Error al procesar la aceptación' });
+    }
+};
+
+module.exports = { crearReporte, obtenerMisReportes, obtenerReportesActivos, aceptarReporte };
