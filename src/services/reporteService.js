@@ -1,16 +1,24 @@
 const reporteModel = require('../models/reporteModel');
-const admin = require('firebase-admin');
+const path = require('path');
+// Importaciones modulares modernas de Firebase Admin
+const { initializeApp, cert, getApps } = require('firebase-admin/app');
+const { getMessaging } = require('firebase-admin/messaging');
 
 // Inicializar Firebase Admin
 try {
-    const serviceAccount = require('../../firebase-key.json');
-    if (!admin.apps.length) {
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
+    const rutaKey = path.join(process.cwd(), 'firebase-key.json');
+    const serviceAccount = require(rutaKey);
+    
+    // getApps() reemplaza a admin.apps
+    if (getApps().length === 0) {
+        initializeApp({
+            credential: cert(serviceAccount)
         });
+        console.log("Firebase inicializado con éxito.");
     }
 } catch (error) {
-    console.error("No se encontró firebase-key.json. Las notificaciones push no se enviarán.");
+    console.error("❌ Fallo en la inicialización de Firebase. El error real es:");
+    console.error(error);
 }
 
 const crearNuevoReporte = async (usuario_id, body, file) => {
@@ -35,7 +43,7 @@ const crearNuevoReporte = async (usuario_id, body, file) => {
 
     // Disparar Notificación Push a la app
     try {
-        if (admin.apps.length > 0) {
+        if (getApps().length > 0) {
             const mensajePayload = {
                 notification: {
                     title: '¡Emergencia de Rescate!',
@@ -43,7 +51,8 @@ const crearNuevoReporte = async (usuario_id, body, file) => {
                 },
                 topic: 'voluntarios'
             };
-            await admin.messaging().send(mensajePayload);
+            // Usamos getMessaging() en lugar de admin.messaging()
+            await getMessaging().send(mensajePayload);
         }
     } catch (pushError) {
         console.error("Fallo al enviar notificación push:", pushError);
