@@ -17,7 +17,7 @@ try {
         console.log("Firebase inicializado con éxito.");
     }
 } catch (error) {
-    console.error("❌ Fallo en la inicialización de Firebase. El error real es:");
+    console.error("Fallo en la inicialización de Firebase. El error es:");
     console.error(error);
 }
 
@@ -41,17 +41,41 @@ const crearNuevoReporte = async (usuario_id, body, file) => {
 
     const resultado = await reporteModel.crearReporteConFoto(datosReporte);
 
-    // Disparar Notificación Push a la app
+// Disparar Notificación Push a la app
     try {
         if (getApps().length > 0) {
+            // Empacamos el reporte en formato JSON para que Flutter lo pueda leer
+            const reporteString = JSON.stringify({
+                id: resultado.reporte_id,
+                especie: especie,
+                color_dominante: color_dominante,
+                sexo: sexo || 'Desconocido',
+                edad_aprox: edad_aprox || 'Cachorro',
+                tamano: tamano || 'Pequeño',
+                agresividad: parseInt(agresividad) || 1,
+                raza_aprox: raza_aprox || 'Desconocida',
+                caracteristicas_especiales: caracteristicas_especiales || 'Ninguna',
+                notas_adicionales: notas_adicionales || 'Sin notas',
+                estado: 'Nuevo',
+                latitud: parseFloat(latitud),
+                longitud: parseFloat(longitud),
+                foto_url: resultado.foto_url
+            });
+
             const mensajePayload = {
                 notification: {
                     title: '¡Emergencia de Rescate!',
                     body: `Se reportó un ${especie} (${color_dominante}) que necesita ayuda.`
                 },
+                android: {
+                    priority: 'high'
+                },
+                // AÑADIDO: El paquete de datos oculto para el enrutamiento
+                data: {
+                    reporte: reporteString
+                },
                 topic: 'voluntarios'
             };
-            // Usamos getMessaging() en lugar de admin.messaging()
             await getMessaging().send(mensajePayload);
         }
     } catch (pushError) {
