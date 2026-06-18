@@ -121,4 +121,68 @@ const verificarToken = async (req, res) => {
     }
 };
 
-module.exports = { registrarUsuario, iniciarSesion, verificarToken };
+const obtenerPerfil = async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                u.id, 
+                u.rol_id AS role, 
+                r.nombre AS nombre_rol, 
+                u.nombre_completo, 
+                u.telefono, 
+                u.email 
+            FROM usuarios u
+            INNER JOIN roles r ON u.rol_id = r.id
+            WHERE u.id = $1
+        `;
+        const result = await pool.query(query, [req.usuario.id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+
+        return res.status(200).json(result.rows[0]);
+    } catch (error) {
+        console.error('Error al obtener perfil:', error);
+        return res.status(500).json({ error: 'Error interno al cargar el perfil' });
+    }
+};
+
+const actualizarPerfil = async (req, res) => {
+    const { telefono, role } = req.body; 
+    const usuario_id = req.usuario.id; 
+
+    try {
+        if (role && role !== 1 && role !== 2) {
+            return res.status(403).json({ 
+                error: 'Acción no permitida. Solo puedes cambiar tu rol a Reportante o Voluntario.' 
+            });
+        }
+
+        const updateQuery = `
+            UPDATE usuarios 
+            SET 
+                telefono = COALESCE($1, telefono), 
+                rol_id = COALESCE($2, rol_id)
+            WHERE id = $3
+            RETURNING id, rol_id AS role, nombre_completo, telefono, email;
+        `;
+        
+        const result = await pool.query(updateQuery, [telefono || null, role || null, usuario_id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+
+        return res.status(200).json({
+            mensaje: 'Perfil actualizado exitosamente',
+            usuario: result.rows[0]
+        });
+
+    } catch (error) {
+        console.error('Error al actualizar el perfil:', error);
+        return res.status(500).json({ error: 'Error interno al actualizar perfil' });
+    }
+};
+
+module.exports = { registrarUsuario, iniciarSesion, verificarToken, obtenerPerfil, actualizarPerfil };
