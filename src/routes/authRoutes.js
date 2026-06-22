@@ -5,7 +5,7 @@ const {
     iniciarSesion, 
     obtenerPerfil, 
     actualizarPerfil, 
-    verificarToken // <-- Solución: La función ahora está importada correctamente
+    verificarToken
 } = require('../controllers/authController');
 const authMiddleware = require('../middlewares/auth');
 
