@@ -14,8 +14,7 @@ try {
         console.log("Firebase inicializado con éxito.");
     }
 } catch (error) {
-    console.error("Fallo en la inicialización de Firebase.");
-    console.error(error);
+    console.error("Fallo en la inicialización de Firebase:", error);
 }
 
 const crearNuevoReporte = async (usuario_id, body, file) => {
@@ -23,8 +22,7 @@ const crearNuevoReporte = async (usuario_id, body, file) => {
 
     const { 
         latitud, longitud, especie, color_dominante, 
-        sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales,
-        urgencia // NUEVO
+        sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia
     } = body;
 
     if (!latitud || !longitud || !especie || !color_dominante) {
@@ -84,7 +82,23 @@ const obtenerActivos = async () => {
 };
 
 const aceptarRescate = async (reporte_id, voluntario_id) => {
+    // 1. REGLA DE NEGOCIO: Bloquear si ya tiene un caso en proceso
+    const rescateOcupado = await reporteModel.verificarRescateActivo(voluntario_id);
+    if (rescateOcupado) {
+        throw { statusCode: 403, message: 'Ya tienes un caso en proceso. Finalízalo antes de aceptar otro.' };
+    }
     await reporteModel.actualizarEstadoReporte(reporte_id, voluntario_id, 'En_Proceso');
 };
 
-module.exports = { crearNuevoReporte, obtenerMisReportes, obtenerActivos, aceptarRescate };
+const obtenerRescateAsignado = async (voluntario_id) => {
+    return await reporteModel.obtenerMiRescateActivo(voluntario_id);
+};
+
+const finalizarRescateAsignado = async (reporte_id, voluntario_id) => {
+    await reporteModel.finalizarEstadoRescate(reporte_id, voluntario_id);
+};
+
+module.exports = { 
+    crearNuevoReporte, obtenerMisReportes, obtenerActivos, 
+    aceptarRescate, obtenerRescateAsignado, finalizarRescateAsignado 
+};

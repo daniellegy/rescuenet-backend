@@ -35,23 +35,22 @@ const registrarUsuario = async (req, res) => {
             }
         };
 
-        jwt.sign(
-            payload,
-            process.env.JWT_SECRET,
-            { expiresIn: '30d' }, 
-            (err, token) => {
-                if (err) throw err;
-                res.status(201).json({
-                    mensaje: 'Usuario registrado exitosamente',
-                    token: token,
-                    usuario: usuario
-                });
-            }
-        );
+        jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '30d' }, (err, token) => {
+            if (err) throw err;
+            res.status(201).json({
+                mensaje: 'Usuario registrado exitosamente',
+                token: token,
+                usuario: {
+                    id: usuario.id,
+                    rol_id: usuario.rol_id,
+                    nombre: usuario.nombre_completo
+                }
+            });
+        });
 
     } catch (error) {
-        console.error('Error en registro:', error);
-        res.status(500).json({ error: 'Error interno del servidor al registrar usuario' });
+        console.error('Error al registrar usuario:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
@@ -63,17 +62,14 @@ const iniciarSesion = async (req, res) => {
     }
 
     try {
-        const query = 'SELECT id, rol_id, password_hash, nombre_completo FROM usuarios WHERE email = $1';
-        const result = await pool.query(query, [email]);
-
+        const result = await pool.query('SELECT id, rol_id, password_hash, nombre_completo FROM usuarios WHERE email = $1', [email]);
         if (result.rows.length === 0) {
             return res.status(401).json({ error: 'Credenciales inválidas' });
         }
 
         const usuario = result.rows[0];
-
-        const passwordValida = await bcrypt.compare(password, usuario.password_hash);
-        if (!passwordValida) {
+        const isMatch = await bcrypt.compare(password, usuario.password_hash);
+        if (!isMatch) {
             return res.status(401).json({ error: 'Credenciales inválidas' });
         }
 
@@ -84,23 +80,18 @@ const iniciarSesion = async (req, res) => {
             }
         };
 
-        jwt.sign(
-            payload,
-            process.env.JWT_SECRET,
-            { expiresIn: '30d' },
-            (err, token) => {
-                if (err) throw err;
-                res.status(200).json({
-                    mensaje: 'Inicio de sesión exitoso',
-                    token: token,
-                    usuario: {
-                        id: usuario.id,
-                        rol_id: usuario.rol_id,
-                        nombre: usuario.nombre_completo
-                    }
-                });
-            }
-        );
+        jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '30d' }, (err, token) => {
+            if (err) throw err;
+            res.status(200).json({
+                mensaje: 'Inicio de sesión exitoso',
+                token: token,
+                usuario: {
+                    id: usuario.id,
+                    rol_id: usuario.rol_id,
+                    nombre: usuario.nombre_completo
+                }
+            });
+        });
 
     } catch (error) {
         console.error('Error en login:', error);
@@ -108,13 +99,11 @@ const iniciarSesion = async (req, res) => {
     }
 };
 
-// NUEVA FUNCIÓN: Validar token al abrir la app
 const verificarToken = async (req, res) => {
-    // Si llega a este punto, el middleware auth.js ya confirmó que el token es real y no ha expirado
     try {
         return res.status(200).json({
             mensaje: 'Token válido',
-            usuario: req.usuario // req.usuario contiene id y rol_id insertados por el middleware
+            usuario: req.usuario
         });
     } catch (error) {
         return res.status(500).json({ error: 'Error al verificar la sesión' });
@@ -123,18 +112,7 @@ const verificarToken = async (req, res) => {
 
 const obtenerPerfil = async (req, res) => {
     try {
-        const query = `
-            SELECT 
-                u.id, 
-                u.rol_id AS role, 
-                r.nombre AS nombre_rol, 
-                u.nombre_completo, 
-                u.telefono, 
-                u.email 
-            FROM usuarios u
-            INNER JOIN roles r ON u.rol_id = r.id
-            WHERE u.id = $1
-        `;
+        const query = 'SELECT id, rol_id AS role, nombre_completo, telefono, email, curp FROM usuarios WHERE id = $1';
         const result = await pool.query(query, [req.usuario.id]);
 
         if (result.rows.length === 0) {
@@ -149,24 +127,41 @@ const obtenerPerfil = async (req, res) => {
 };
 
 const actualizarPerfil = async (req, res) => {
-    const { telefono } = req.body; 
+    // AÑADIDO: Recibir la curp
+    const { telefono, email, role, curp } = req.body; 
     const usuario_id = req.usuario.id; 
 
     try {
-        // Validación estricta: solo números y guiones, mínimo 10 caracteres
         if (telefono && !/^[0-9\-()+\s]{10,15}$/.test(telefono)) {
             return res.status(400).json({ error: 'Formato de teléfono inválido' });
         }
 
-        // Eliminamos "role" de la consulta SQL. El rol solo lo cambia un Superadmin en otro endpoint.
+        if (email && !/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email)) {
+            return res.status(400).json({ error: 'Formato de correo inválido' });
+        }
+
+        if (role && role !== 1 && role !== 2) {
+            return res.status(403).json({ error: 'Acción denegada. Rol inválido.' });
+        }
+
+        // AÑADIDO: Validación de seguridad para la CURP
+        if (curp && curp.trim().length !== 18) {
+            return res.status(400).json({ error: 'El CURP proporcionado es inválido (debe tener 18 caracteres).' });
+        }
+
+        // AÑADIDO: curp en el COALESCE
         const updateQuery = `
             UPDATE usuarios 
-            SET telefono = COALESCE($1, telefono)
-            WHERE id = $2
-            RETURNING id, rol_id AS role, nombre_completo, telefono, email;
+            SET 
+                telefono = COALESCE($1, telefono),
+                email = COALESCE($2, email),
+                rol_id = COALESCE($3, rol_id),
+                curp = COALESCE($4, curp)
+            WHERE id = $5
+            RETURNING id, rol_id AS role, nombre_completo, telefono, email, curp;
         `;
         
-        const result = await pool.query(updateQuery, [telefono || null, usuario_id]);
+        const result = await pool.query(updateQuery, [telefono || null, email || null, role || null, curp || null, usuario_id]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -178,6 +173,9 @@ const actualizarPerfil = async (req, res) => {
         });
 
     } catch (error) {
+        if (error.code === '23505' && error.constraint === 'usuarios_email_key') {
+            return res.status(409).json({ error: 'El correo electrónico ya está en uso por otra cuenta.' });
+        }
         console.error('Error al actualizar el perfil:', error);
         return res.status(500).json({ error: 'Error interno al actualizar perfil' });
     }
