@@ -9,6 +9,8 @@ router.post('/register', registrarUsuario);
 // Ruta: POST /api/auth/login
 router.post('/login', iniciarSesion);
 
+router.get('/verify', authMiddleware, verificarToken);
+
 // Ruta: GET /api/auth/perfil
 router.get('/perfil', authMiddleware, obtenerPerfil);
 
