@@ -4,6 +4,7 @@ const crearReporteConFoto = async (datos) => {
     const { 
         usuario_id, latitud, longitud, especie, color_dominante, 
         sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales,
+        urgencia,
         url_archivo 
     } = datos;
     
@@ -15,29 +16,35 @@ const crearReporteConFoto = async (datos) => {
         const insertReporteQuery = `
             INSERT INTO reportes (
                 usuario_reportador_id, ubicacion, especie, color_dominante, 
-                sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, estado
+                sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, estado
             ) 
-            VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326), $4, $5, $6, $7, $8, $9, $10, $11, $12, 'Nuevo') 
+            VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Nuevo') 
             RETURNING id;
         `;
         const reporteValues = [
             usuario_id, parseFloat(longitud), parseFloat(latitud), especie, color_dominante,
             sexo || 'Desconocido', edad_aprox || 'Cachorro', tamano || null, agresividad || 1,
-            raza_aprox || null, caracteristicas_especiales || null, notas_adicionales || null
+            raza_aprox || null, caracteristicas_especiales || null, notas_adicionales || null, urgencia || 'media'
         ];
         
         const resReporte = await client.query(insertReporteQuery, reporteValues);
         const reporte_id = resReporte.rows[0].id;
 
-        const insertFotoQuery = `
-            INSERT INTO reporte_multimedia (reporte_id, url_archivo, tipo)
-            VALUES ($1, $2, 'Foto_Animal');
+        const insertMultimediaQuery = `
+            INSERT INTO reporte_multimedia (reporte_id, tipo, url_archivo)
+            VALUES ($1, 'Foto_Animal', $2);
         `;
-        await client.query(insertFotoQuery, [reporte_id, url_archivo]);
+        await client.query(insertMultimediaQuery, [reporte_id, url_archivo]);
 
         await client.query('COMMIT');
         
-        return { reporte_id, foto_url: url_archivo };
+        return { 
+            reporte_id, 
+            ubicacion: { latitud: parseFloat(latitud), longitud: parseFloat(longitud) },
+            urgencia: urgencia || 'media',
+            foto_url: url_archivo 
+        };
+
     } catch (error) {
         await client.query('ROLLBACK');
         throw error;
@@ -48,9 +55,9 @@ const crearReporteConFoto = async (datos) => {
 
 const obtenerHistorial = async (usuario_id) => {
     const query = `
-        SELECT
+        SELECT 
             r.id, r.especie, r.color_dominante, r.sexo, r.edad_aprox, r.agresividad,
-            r.tamano, r.raza_aprox, r.caracteristicas_especiales, r.notas_adicionales, r.estado,
+            r.tamano, r.raza_aprox, r.caracteristicas_especiales, r.notas_adicionales, r.urgencia, r.estado,
             ST_Y(r.ubicacion::geometry) AS latitud, ST_X(r.ubicacion::geometry) AS longitud,
             m.url_archivo AS foto_url
         FROM reportes r
@@ -61,12 +68,11 @@ const obtenerHistorial = async (usuario_id) => {
     return rows;
 };
 
-// Exclusivo para Voluntarios: Reportes con estado 'Nuevo'
 const obtenerReportesActivos = async () => {
     const query = `
-        SELECT
+        SELECT 
             r.id, r.especie, r.color_dominante, r.sexo, r.edad_aprox, r.agresividad,
-            r.tamano, r.raza_aprox, r.caracteristicas_especiales, r.notas_adicionales, r.estado,
+            r.tamano, r.raza_aprox, r.caracteristicas_especiales, r.notas_adicionales, r.urgencia, r.estado,
             ST_Y(r.ubicacion::geometry) AS latitud, ST_X(r.ubicacion::geometry) AS longitud,
             m.url_archivo AS foto_url
         FROM reportes r
@@ -79,11 +85,14 @@ const obtenerReportesActivos = async () => {
 
 const actualizarEstadoReporte = async (reporte_id, voluntario_id, estado) => {
     const query = `
-        UPDATE reportes
+        UPDATE reportes 
         SET estado = $1, usuario_rescatista_id = $2, actualizado_el = CURRENT_TIMESTAMP
-        WHERE id = $3 RETURNING id;
+        WHERE id = $3 AND estado = 'Nuevo'
+        RETURNING id;
     `;
-    await pool.query(query, [estado, voluntario_id, reporte_id]);
+    const { rows } = await pool.query(query, [estado, voluntario_id, reporte_id]);
+    if (rows.length === 0) throw { statusCode: 404, message: 'Reporte no encontrado o ya fue aceptado' };
+    return rows[0];
 };
 
 module.exports = { crearReporteConFoto, obtenerHistorial, obtenerReportesActivos, actualizarEstadoReporte };
