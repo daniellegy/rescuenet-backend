@@ -149,26 +149,24 @@ const obtenerPerfil = async (req, res) => {
 };
 
 const actualizarPerfil = async (req, res) => {
-    const { telefono, role } = req.body; 
+    const { telefono } = req.body; 
     const usuario_id = req.usuario.id; 
 
     try {
-        if (role && role !== 1 && role !== 2) {
-            return res.status(403).json({ 
-                error: 'Acción no permitida. Solo puedes cambiar tu rol a Reportante o Voluntario.' 
-            });
+        // Validación estricta: solo números y guiones, mínimo 10 caracteres
+        if (telefono && !/^[0-9\-()+\s]{10,15}$/.test(telefono)) {
+            return res.status(400).json({ error: 'Formato de teléfono inválido' });
         }
 
+        // Eliminamos "role" de la consulta SQL. El rol solo lo cambia un Superadmin en otro endpoint.
         const updateQuery = `
             UPDATE usuarios 
-            SET 
-                telefono = COALESCE($1, telefono), 
-                rol_id = COALESCE($2, rol_id)
-            WHERE id = $3
+            SET telefono = COALESCE($1, telefono)
+            WHERE id = $2
             RETURNING id, rol_id AS role, nombre_completo, telefono, email;
         `;
         
-        const result = await pool.query(updateQuery, [telefono || null, role || null, usuario_id]);
+        const result = await pool.query(updateQuery, [telefono || null, usuario_id]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Usuario no encontrado' });
