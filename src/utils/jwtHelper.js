@@ -5,7 +5,8 @@ const generarToken = (usuario) => {
     const payload = {
         usuario: {
             id: usuario.id,
-            rol_id: usuario.rol_id
+            rol_id: usuario.rol_id,
+            nombre_completo: usuario.nombre_completo // 🌟 AHORA EL TOKEN LLEVARÁ EL NOMBRE
         }
     };
     
