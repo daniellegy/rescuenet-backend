@@ -79,7 +79,8 @@ const obtenerReportesActivos = async () => {
             m.url_archivo AS foto_url
         FROM reportes r
         LEFT JOIN reporte_multimedia m ON r.id = m.reporte_id AND m.tipo = 'Foto_Animal'
-        WHERE r.estado = 'Nuevo' ORDER BY r.id DESC;
+        WHERE r.estado IN ('Nuevo', 'En_Proceso') 
+        ORDER BY r.id DESC;
     `;
     const { rows } = await pool.query(query);
     return rows;
