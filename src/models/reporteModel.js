@@ -22,7 +22,7 @@ const crearReporteConFoto = async (datos) => {
 const _baseSelectQuery = `
     SELECT 
         r.id, r.especie, r.color_dominante, r.sexo, r.edad_aprox, r.agresividad, r.tamano, r.raza_aprox, r.caracteristicas_especiales, r.notas_adicionales, r.urgencia, r.estado, r.usuario_rescatista_id, r.usuario_reportador_id,
-        r.animal_avistado, r.lugar_traslado, r.destino_final, r.costo_rescate, r.condicion_rescate, r.referencias, r.radio, r.conclusion,
+        r.animal_avistado, r.lugar_traslado, r.destino_final, r.costo_rescate, r.condicion_rescate, r.referencias, r.radio,
         ST_Y(r.ubicacion::geometry) AS latitud, ST_X(r.ubicacion::geometry) AS longitud,
         m1.url_archivo AS foto_url, m2.url_archivo AS foto_evidencia_url,
         r.creado_el AS fecha_creacion, u_rep.nombre_completo AS nombre_reportador, u_resc.nombre_completo AS nombre_rescatista
@@ -38,8 +38,28 @@ const obtenerHistorial = async (usuario_id) => {
     return rows;
 };
 
-const obtenerReportesActivos = async (limit = 50, offset = 0) => {
-    const { rows } = await pool.query(`${_baseSelectQuery} WHERE r.estado IN ('Nuevo', 'En_Proceso') ORDER BY r.id DESC LIMIT $1 OFFSET $2;`, [limit, offset]);
+const obtenerReportesActivos = async (limit = 50, offset = 0, usuario_id = null, lat = null, lng = null) => {
+    let locationFilter = '';
+    let queryParams = [limit, offset];
+    let paramIndex = 3;
+
+    if (lat && lng && usuario_id) {
+        // Consultamos el radio configurado por este usuario
+        const userRes = await pool.query('SELECT radio_notificaciones FROM usuarios WHERE id = $1', [usuario_id]);
+        const radioKm = (userRes.rows[0] && userRes.rows[0].radio_notificaciones) ? userRes.rows[0].radio_notificaciones : 30; // 30km por defecto
+        
+        locationFilter = `AND ST_DWithin(r.ubicacion::geography, ST_SetSRID(ST_MakePoint($${paramIndex}, $${paramIndex+1}), 4326)::geography, $${paramIndex+2})`;
+        queryParams.push(parseFloat(lng), parseFloat(lat), radioKm * 1000); // Se convierte a metros
+    }
+
+    const query = `
+        ${_baseSelectQuery} 
+        WHERE r.estado IN ('Nuevo', 'En_Proceso') 
+        ${locationFilter}
+        ORDER BY r.id DESC LIMIT $1 OFFSET $2;
+    `;
+    
+    const { rows } = await pool.query(query, queryParams);
     return rows;
 };
 
@@ -90,7 +110,10 @@ const finalizarEstadoRescate = async (reporte_id, voluntario_id, detalles, evide
         const updateQuery = `
             UPDATE reportes 
             SET estado = 'Rescatado', costo_rescate = $3, destino_final = $4, condicion_rescate = $5,
-                conclusion = $6,
+                notas_adicionales = CASE 
+                    WHEN $6::text IS NOT NULL AND $6::text <> '' THEN CONCAT(notas_adicionales, CHR(10), 'Conclusión: ', $6::text)
+                    ELSE notas_adicionales 
+                END,
                 actualizado_el = CURRENT_TIMESTAMP
             WHERE id = $1 AND usuario_rescatista_id = $2 AND estado = 'En_Proceso' RETURNING id;
         `;
@@ -110,14 +133,4 @@ const finalizarEstadoRescate = async (reporte_id, voluntario_id, detalles, evide
     }
 };
 
-module.exports = { 
-    crearReporteConFoto, 
-    obtenerHistorial, 
-    obtenerReportesActivos, 
-    verificarRescateActivo, 
-    obtenerMiRescateActivo, 
-    actualizarEstadoReporte, 
-    abortarRescate, 
-    actualizarProgresoRescate, 
-    finalizarEstadoRescate 
-};
+module.exports = { crearReporteConFoto, obtenerHistorial, obtenerReportesActivos, verificarRescateActivo, obtenerMiRescateActivo, actualizarEstadoReporte, abortarRescate, actualizarProgresoRescate, finalizarEstadoRescate };

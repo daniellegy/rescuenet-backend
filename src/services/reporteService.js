@@ -1,9 +1,9 @@
 const reporteModel = require('../models/reporteModel');
+const usuarioModel = require('../models/usuarioModel'); // Requerimos el modelo para sacar los tokens
 const path = require('path');
 const { initializeApp, cert, getApps } = require('firebase-admin/app');
 const { getMessaging } = require('firebase-admin/messaging');
 
-// Inicialización de Firebase
 try {
     const rutaKey = path.join(process.cwd(), 'firebase-key.json');
     const serviceAccount = require(rutaKey);
@@ -59,17 +59,28 @@ const crearNuevoReporte = async (usuario, body, file) => {
                 radio: parseInt(radio, 10) || 500
             });
 
-            const emoji = urgencia === 'alta' ? '🚨' : urgencia === 'media' ? '⚠️' : '🐾';
-            const mensajePayload = {
-                notification: {
-                    title: `${emoji} Emergencia de Rescate (${urgencia.toUpperCase()})`,
-                    body: `Se reportó un ${especie} (${color_dominante}) que necesita ayuda.`
-                },
-                android: { priority: 'high' },
-                data: { reporte: reporteString },
-                topic: 'voluntarios'
-            };
-            await getMessaging().send(mensajePayload);
+            // OBTENEMOS SÓLO LOS TOKENS QUE ESTÁN DENTRO DE SU RADIO CONFIGURADO
+            const tokens = await usuarioModel.obtenerTokensVoluntariosCercanos(latitud, longitud);
+
+            if (tokens.length > 0) {
+                const emoji = urgencia === 'alta' ? '🚨' : urgencia === 'media' ? '⚠️' : '🐾';
+                const mensajePayload = {
+                    notification: {
+                        title: `${emoji} Emergencia de Rescate (${urgencia.toUpperCase()})`,
+                        body: `Se reportó un ${especie} (${color_dominante}) que necesita ayuda cerca de ti.`
+                    },
+                    android: { priority: 'high' },
+                    data: { reporte: reporteString }
+                };
+                
+                // MULTICAST: Firebase envía notificaciones precisas a esta lista de dispositivos
+                await getMessaging().sendEachForMulticast({
+                    tokens: tokens,
+                    notification: mensajePayload.notification,
+                    data: mensajePayload.data,
+                    android: mensajePayload.android
+                });
+            }
         }
     } catch (pushError) {
         console.error("Fallo al enviar notificación push:", pushError);
@@ -82,13 +93,12 @@ const obtenerMisReportes = async (usuario_id) => {
     return await reporteModel.obtenerHistorial(usuario_id);
 };
 
-const obtenerActivos = async (limit, offset) => {
-    return await reporteModel.obtenerReportesActivos(limit, offset);
+// Modificado para pasar las coordenadas geográficas al modelo
+const obtenerActivos = async (limit, offset, usuario_id, lat, lng) => {
+    return await reporteModel.obtenerReportesActivos(limit, offset, usuario_id, lat, lng);
 };
 
 const aceptarRescate = async (reporte_id, voluntario_id) => {
-    // Aquí es donde ocurría tu error. Ahora el servicio llama limpiamente al modelo.
-    // El modelo es el encargado de interactuar con el 'pool' de la DB.
     const rescateOcupadoRes = await reporteModel.verificarRescateActivo(voluntario_id);
     if (rescateOcupadoRes) {
         throw { statusCode: 403, message: 'Ya tienes un caso en proceso. Finalízalo antes de aceptar otro.' };
@@ -114,13 +124,4 @@ const finalizarRescateAsignado = async (reporte_id, voluntario_id, detalles, fil
     return await reporteModel.finalizarEstadoRescate(reporte_id, voluntario_id, detalles, evidencia_url);
 };
 
-module.exports = { 
-    crearNuevoReporte, 
-    obtenerMisReportes, 
-    obtenerActivos, 
-    aceptarRescate, 
-    obtenerRescateAsignado, 
-    abortarRescateAsignado, 
-    actualizarProgreso, 
-    finalizarRescateAsignado 
-};
+module.exports = { crearNuevoReporte, obtenerMisReportes, obtenerActivos, aceptarRescate, obtenerRescateAsignado, abortarRescateAsignado, actualizarProgreso, finalizarRescateAsignado };

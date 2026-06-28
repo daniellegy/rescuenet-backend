@@ -1,4 +1,5 @@
 const reporteService = require('../services/reporteService');
+const usuarioModel = require('../models/usuarioModel');
 const cloudinary = require('../config/cloudinary');
 
 const crearReporte = async (req, res) => {
@@ -6,13 +7,8 @@ const crearReporte = async (req, res) => {
         const resultado = await reporteService.crearNuevoReporte(req.usuario, req.body, req.file);
         return res.status(201).json({ mensaje: 'Reporte creado', ...resultado });
     } catch (error) {
-        // Hacemos rollback del archivo en Cloudinary si falla la inserción en la base de datos (Ej: caída de BD)
         if (req.file && req.file.filename) {
-            try {
-                await cloudinary.uploader.destroy(req.file.filename);
-            } catch (cloudErr) {
-                console.error('Error al limpiar imagen huérfana (BD Fallida):', cloudErr);
-            }
+            try { await cloudinary.uploader.destroy(req.file.filename); } catch (cloudErr) { }
         }
         const status = error.statusCode || 500;
         return res.status(status).json({ error: error.message || 'Error interno' });
@@ -33,8 +29,14 @@ const obtenerReportesActivos = async (req, res) => {
         const page = parseInt(req.query.page, 10) || 1;
         const limit = parseInt(req.query.limit, 10) || 50;
         const offset = (page - 1) * limit;
+        const { lat, lng } = req.query;
 
-        const activos = await reporteService.obtenerActivos(limit, offset);
+        // Actualizamos la ubicación del usuario en segundo plano para notificaciones futuras
+        if (lat && lng) {
+            await usuarioModel.actualizarUltimaUbicacion(req.usuario.id, lat, lng);
+        }
+
+        const activos = await reporteService.obtenerActivos(limit, offset, req.usuario.id, lat, lng);
         return res.status(200).json(activos);
     } catch (error) {
         return res.status(500).json({ error: 'Error al cargar reportes activos' });
@@ -86,13 +88,8 @@ const finalizarReporte = async (req, res) => {
         await reporteService.finalizarRescateAsignado(req.params.id, req.usuario.id, req.body, req.file);
         return res.status(200).json({ mensaje: 'Rescate finalizado con éxito' });
     } catch (error) {
-        // Limpiamos la evidencia en Cloudinary si falla finalizar
         if (req.file && req.file.filename) {
-            try {
-                await cloudinary.uploader.destroy(req.file.filename);
-            } catch (cloudErr) {
-                console.error('Error al limpiar evidencia huérfana:', cloudErr);
-            }
+            try { await cloudinary.uploader.destroy(req.file.filename); } catch (cloudErr) { }
         }
         return res.status(error.statusCode || 500).json({ error: error.message || 'Error al finalizar el rescate' });
     }
