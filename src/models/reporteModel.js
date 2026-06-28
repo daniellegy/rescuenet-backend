@@ -22,7 +22,7 @@ const crearReporteConFoto = async (datos) => {
 const _baseSelectQuery = `
     SELECT 
         r.id, r.especie, r.color_dominante, r.sexo, r.edad_aprox, r.agresividad, r.tamano, r.raza_aprox, r.caracteristicas_especiales, r.notas_adicionales, r.urgencia, r.estado, r.usuario_rescatista_id, r.usuario_reportador_id,
-        r.animal_avistado, r.lugar_traslado, r.destino_final, r.costo_rescate, r.condicion_rescate, r.referencias, r.radio,
+        r.animal_avistado, r.lugar_traslado, r.destino_final, r.costo_rescate, r.condicion_rescate, r.referencias, r.radio, r.conclusion,
         ST_Y(r.ubicacion::geometry) AS latitud, ST_X(r.ubicacion::geometry) AS longitud,
         m1.url_archivo AS foto_url, m2.url_archivo AS foto_evidencia_url,
         r.creado_el AS fecha_creacion, u_rep.nombre_completo AS nombre_reportador, u_resc.nombre_completo AS nombre_rescatista
@@ -87,14 +87,10 @@ const finalizarEstadoRescate = async (reporte_id, voluntario_id, detalles, evide
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        // REEMPLAZO EXACTO DE NOTAS ADICIONALES POR LA CONCLUSIÓN DEL STEPPER
         const updateQuery = `
             UPDATE reportes 
             SET estado = 'Rescatado', costo_rescate = $3, destino_final = $4, condicion_rescate = $5,
-                notas_adicionales = CASE 
-                    WHEN $6::text IS NOT NULL AND $6::text <> '' THEN $6::text
-                    ELSE notas_adicionales 
-                END,
+                conclusion = $6,
                 actualizado_el = CURRENT_TIMESTAMP
             WHERE id = $1 AND usuario_rescatista_id = $2 AND estado = 'En_Proceso' RETURNING id;
         `;
