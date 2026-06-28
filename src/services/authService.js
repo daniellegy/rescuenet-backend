@@ -1,8 +1,8 @@
 const bcrypt = require('bcryptjs');
 const usuarioModel = require('../models/usuarioModel');
 const { generarToken } = require('../utils/jwtHelper');
+const pool = require('../config/database');
 
-// Función de ayuda para lanzar errores limpios
 const lanzarError = (mensaje, statusCode) => {
     const error = new Error(mensaje);
     error.statusCode = statusCode;
@@ -11,25 +11,25 @@ const lanzarError = (mensaje, statusCode) => {
 
 const registrarUsuario = async (datos) => {
     const { nombre_completo, telefono, email, password, rol_id, curp } = datos;
+    if (!nombre_completo || !telefono || !email || !password || !rol_id) {
+        lanzarError('Faltan campos obligatorios', 400);
+    }
 
-    // Validación de negocio
     const usuarioExistente = await usuarioModel.buscarPorEmail(email);
     if (usuarioExistente) lanzarError('El correo ya está registrado', 409);
 
-    // Encriptación
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // Persistencia
     const nuevoUsuario = await usuarioModel.crearUsuario(rol_id, nombre_completo, telefono, email, passwordHash, curp);
-
-    // Generación de Token
     const token = generarToken(nuevoUsuario);
 
-    return { token, usuario: nuevoUsuario };
+    return { token, usuario: { id: nuevoUsuario.id, rol_id: nuevoUsuario.rol_id, nombre: nuevoUsuario.nombre_completo } };
 };
 
 const iniciarSesion = async (email, password) => {
+    if (!email || !password) lanzarError('Por favor ingresa correo y contraseña', 400);
+
     const usuario = await usuarioModel.buscarPorEmail(email);
     if (!usuario) lanzarError('Credenciales inválidas', 401);
 
@@ -44,4 +44,36 @@ const iniciarSesion = async (email, password) => {
     };
 };
 
-module.exports = { registrarUsuario, iniciarSesion };
+const obtenerPerfil = async (usuario_id) => {
+    const perfil = await usuarioModel.obtenerPerfilPorId(usuario_id);
+    if (!perfil) lanzarError('Usuario no encontrado', 404);
+    return perfil;
+};
+
+const actualizarPerfil = async (usuario_id, datos) => {
+    const { telefono, email, role, curp } = datos;
+
+    if (telefono && !/^[0-9\-()+\s]{10,15}$/.test(telefono)) lanzarError('Formato de teléfono inválido', 400);
+    if (email && !/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email)) lanzarError('Formato de correo inválido', 400);
+    if (role && role !== 1 && role !== 2) lanzarError('Acción denegada. Rol inválido.', 403);
+    if (curp && curp.trim().length !== 18) lanzarError('El CURP proporcionado es inválido.', 400);
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const perfilActualizado = await usuarioModel.actualizarPerfil(client, usuario_id, telefono, email, role, curp);
+        if (!perfilActualizado) lanzarError('Usuario no encontrado', 404);
+        await client.query('COMMIT');
+        return perfilActualizado;
+    } catch (error) {
+        await client.query('ROLLBACK');
+        if (error.code === '23505' && error.constraint === 'usuarios_email_key') {
+            lanzarError('El correo electrónico ya está en uso por otra cuenta.', 409);
+        }
+        throw error;
+    } finally {
+        client.release();
+    }
+};
+
+module.exports = { registrarUsuario, iniciarSesion, obtenerPerfil, actualizarPerfil };
