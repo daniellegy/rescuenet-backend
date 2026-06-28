@@ -3,6 +3,7 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const upload = require('../middlewares/upload'); 
 const auth = require('../middlewares/auth');
+const cloudinary = require('../config/cloudinary'); // Requerimos cloudinary para limpiar archivos huérfanos
 const { crearReporte, obtenerMisReportes, obtenerReportesActivos, aceptarReporte, obtenerMiRescateActivo, finalizarReporte, abortarReporte, actualizarProgreso } = require('../controllers/reporteController');
 
 const validarCreacionReporte = [
@@ -10,9 +11,17 @@ const validarCreacionReporte = [
     body('latitud').isFloat({ min: -90, max: 90 }).withMessage('Latitud fuera de rango'),
     body('longitud').isFloat({ min: -180, max: 180 }).withMessage('Longitud fuera de rango'),
     body('urgencia').optional().isIn(['alta', 'media', 'baja']).withMessage('Urgencia fuera de rango'),
-    (req, res, next) => {
+    async (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
+            // Si la validación falla, eliminamos la imagen recién subida a Cloudinary
+            if (req.file && req.file.filename) {
+                try {
+                    await cloudinary.uploader.destroy(req.file.filename);
+                } catch (cloudErr) {
+                    console.error('Error al eliminar archivo huérfano (Validación):', cloudErr);
+                }
+            }
             return res.status(400).json({ error: 'Datos de entrada inválidos', detalles: errors.array() });
         }
         next();
