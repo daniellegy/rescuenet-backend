@@ -53,15 +53,20 @@ const crearReporteConFoto = async (datos) => {
 };
 
 const obtenerHistorial = async (usuario_id) => {
+    // Añadidos los JOIN a usuarios
     const query = `
         SELECT 
             r.id, r.especie, r.color_dominante, r.sexo, r.edad_aprox, r.agresividad,
             r.tamano, r.raza_aprox, r.caracteristicas_especiales, r.notas_adicionales, r.urgencia, r.estado,
             r.usuario_rescatista_id, r.usuario_reportador_id,
             ST_Y(r.ubicacion::geometry) AS latitud, ST_X(r.ubicacion::geometry) AS longitud,
-            m.url_archivo AS foto_url
+            m.url_archivo AS foto_url,
+            u_rep.nombre_completo AS nombre_reportador,
+            u_resc.nombre_completo AS nombre_rescatista
         FROM reportes r
         LEFT JOIN reporte_multimedia m ON r.id = m.reporte_id AND m.tipo = 'Foto_Animal'
+        LEFT JOIN usuarios u_rep ON r.usuario_reportador_id = u_rep.id
+        LEFT JOIN usuarios u_resc ON r.usuario_rescatista_id = u_resc.id
         WHERE r.usuario_reportador_id = $1 OR r.usuario_rescatista_id = $1 
         ORDER BY r.id DESC;
     `;
@@ -74,11 +79,15 @@ const obtenerReportesActivos = async () => {
         SELECT 
             r.id, r.especie, r.color_dominante, r.sexo, r.edad_aprox, r.agresividad,
             r.tamano, r.raza_aprox, r.caracteristicas_especiales, r.notas_adicionales, r.urgencia, r.estado,
-            r.usuario_rescatista_id,
+            r.usuario_rescatista_id, r.usuario_reportador_id,
             ST_Y(r.ubicacion::geometry) AS latitud, ST_X(r.ubicacion::geometry) AS longitud,
-            m.url_archivo AS foto_url
+            m.url_archivo AS foto_url,
+            u_rep.nombre_completo AS nombre_reportador,
+            u_resc.nombre_completo AS nombre_rescatista
         FROM reportes r
         LEFT JOIN reporte_multimedia m ON r.id = m.reporte_id AND m.tipo = 'Foto_Animal'
+        LEFT JOIN usuarios u_rep ON r.usuario_reportador_id = u_rep.id
+        LEFT JOIN usuarios u_resc ON r.usuario_rescatista_id = u_resc.id
         WHERE r.estado IN ('Nuevo', 'En_Proceso') 
         ORDER BY r.id DESC;
     `;
@@ -86,24 +95,26 @@ const obtenerReportesActivos = async () => {
     return rows;
 };
 
-// NUEVA: Verifica si el voluntario ya tiene un rescate
 const verificarRescateActivo = async (voluntario_id) => {
     const query = `SELECT id FROM reportes WHERE usuario_rescatista_id = $1 AND estado = 'En_Proceso'`;
     const { rows } = await pool.query(query, [voluntario_id]);
     return rows.length > 0 ? rows[0] : null;
 };
 
-// NUEVA: Obtiene todos los detalles del rescate actual del voluntario
 const obtenerMiRescateActivo = async (voluntario_id) => {
     const query = `
         SELECT 
             r.id, r.especie, r.color_dominante, r.sexo, r.edad_aprox, r.agresividad,
             r.tamano, r.raza_aprox, r.caracteristicas_especiales, r.notas_adicionales, r.urgencia, r.estado,
-            r.usuario_rescatista_id,
+            r.usuario_rescatista_id, r.usuario_reportador_id,
             ST_Y(r.ubicacion::geometry) AS latitud, ST_X(r.ubicacion::geometry) AS longitud,
-            m.url_archivo AS foto_url
+            m.url_archivo AS foto_url,
+            u_rep.nombre_completo AS nombre_reportador,
+            u_resc.nombre_completo AS nombre_rescatista
         FROM reportes r
         LEFT JOIN reporte_multimedia m ON r.id = m.reporte_id AND m.tipo = 'Foto_Animal'
+        LEFT JOIN usuarios u_rep ON r.usuario_reportador_id = u_rep.id
+        LEFT JOIN usuarios u_resc ON r.usuario_rescatista_id = u_resc.id
         WHERE r.usuario_rescatista_id = $1 AND r.estado = 'En_Proceso'
         LIMIT 1;
     `;
@@ -123,7 +134,6 @@ const actualizarEstadoReporte = async (reporte_id, voluntario_id, estado) => {
     return rows[0];
 };
 
-// NUEVA: Finalizar el rescate
 const finalizarEstadoRescate = async (reporte_id, voluntario_id) => {
     const query = `
         UPDATE reportes 
