@@ -1,7 +1,6 @@
 const pool = require('../config/database');
 
 const crearReporteConFoto = async (datos) => {
-    // ... (Mantén tu código actual de esta función sin cambios, es largo, te doy el archivo completo aquí)
     const { usuario_id, latitud, longitud, especie, color_dominante, sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, url_archivo } = datos;
     const client = await pool.connect();
     try {
@@ -39,8 +38,8 @@ const obtenerHistorial = async (usuario_id) => {
     return rows;
 };
 
-const obtenerReportesActivos = async () => {
-    const { rows } = await pool.query(`${_baseSelectQuery} WHERE r.estado IN ('Nuevo', 'En_Proceso') ORDER BY r.id DESC;`);
+const obtenerReportesActivos = async (limit = 50, offset = 0) => {
+    const { rows } = await pool.query(`${_baseSelectQuery} WHERE r.estado IN ('Nuevo', 'En_Proceso') ORDER BY r.id DESC LIMIT $1 OFFSET $2;`, [limit, offset]);
     return rows;
 };
 
@@ -68,7 +67,6 @@ const abortarRescate = async (reporte_id, voluntario_id) => {
     return rows[0];
 };
 
-// NUEVA FUNCIÓN: Actualizar progreso en tiempo real
 const actualizarProgresoRescate = async (reporte_id, voluntario_id, animal_avistado, lugar_traslado) => {
     const query = `
         UPDATE reportes 
@@ -102,7 +100,6 @@ const finalizarEstadoRescate = async (reporte_id, voluntario_id, detalles, evide
         const { rows } = await client.query(updateQuery, [reporte_id, voluntario_id, costo || 0, destino, condicion, conclusion]);
         if (rows.length === 0) throw { statusCode: 404, message: 'Rescate no encontrado o sin permisos' };
 
-        // Insertar foto de evidencia si existe
         if (evidencia_url) {
             await client.query(`INSERT INTO reporte_multimedia (reporte_id, tipo, url_archivo) VALUES ($1, 'Evidencia_Rescate', $2);`, [reporte_id, evidencia_url]);
         }

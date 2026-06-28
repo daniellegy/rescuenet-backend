@@ -1,10 +1,25 @@
 const express = require('express');
 const router = express.Router();
+const { body, validationResult } = require('express-validator');
 const upload = require('../middlewares/upload'); 
 const auth = require('../middlewares/auth');
 const { crearReporte, obtenerMisReportes, obtenerReportesActivos, aceptarReporte, obtenerMiRescateActivo, finalizarReporte, abortarReporte, actualizarProgreso } = require('../controllers/reporteController');
 
-router.post('/', auth, upload.single('foto'), crearReporte);
+const validarCreacionReporte = [
+    body('especie').isIn(['Perro', 'Gato', 'Silvestre']).withMessage('Especie inválida'),
+    body('latitud').isFloat({ min: -90, max: 90 }).withMessage('Latitud fuera de rango'),
+    body('longitud').isFloat({ min: -180, max: 180 }).withMessage('Longitud fuera de rango'),
+    body('urgencia').optional().isIn(['alta', 'media', 'baja']).withMessage('Urgencia fuera de rango'),
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ error: 'Datos de entrada inválidos', detalles: errors.array() });
+        }
+        next();
+    }
+];
+
+router.post('/', auth, upload.single('foto'), validarCreacionReporte, crearReporte);
 router.get('/mis-reportes', auth, obtenerMisReportes);
 router.get('/activos', auth, obtenerReportesActivos);
 router.get('/mi-rescate', auth, obtenerMiRescateActivo);

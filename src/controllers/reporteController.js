@@ -21,7 +21,11 @@ const obtenerMisReportes = async (req, res) => {
 
 const obtenerReportesActivos = async (req, res) => {
     try {
-        const activos = await reporteService.obtenerActivos();
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 50;
+        const offset = (page - 1) * limit;
+
+        const activos = await reporteService.obtenerActivos(limit, offset);
         return res.status(200).json(activos);
     } catch (error) {
         return res.status(500).json({ error: 'Error al cargar reportes activos' });

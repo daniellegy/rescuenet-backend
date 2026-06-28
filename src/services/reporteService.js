@@ -76,8 +76,8 @@ const obtenerMisReportes = async (usuario_id) => {
     return await reporteModel.obtenerHistorial(usuario_id);
 };
 
-const obtenerActivos = async () => {
-    return await reporteModel.obtenerReportesActivos();
+const obtenerActivos = async (limit, offset) => {
+    return await reporteModel.obtenerReportesActivos(limit, offset);
 };
 
 const aceptarRescate = async (reporte_id, voluntario_id) => {
