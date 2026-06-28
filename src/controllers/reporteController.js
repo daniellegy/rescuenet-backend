@@ -1,10 +1,19 @@
 const reporteService = require('../services/reporteService');
+const cloudinary = require('../config/cloudinary');
 
 const crearReporte = async (req, res) => {
     try {
         const resultado = await reporteService.crearNuevoReporte(req.usuario, req.body, req.file);
         return res.status(201).json({ mensaje: 'Reporte creado', ...resultado });
     } catch (error) {
+        // Hacemos rollback del archivo en Cloudinary si falla la inserción en la base de datos (Ej: caída de BD)
+        if (req.file && req.file.filename) {
+            try {
+                await cloudinary.uploader.destroy(req.file.filename);
+            } catch (cloudErr) {
+                console.error('Error al limpiar imagen huérfana (BD Fallida):', cloudErr);
+            }
+        }
         const status = error.statusCode || 500;
         return res.status(status).json({ error: error.message || 'Error interno' });
     }
@@ -77,6 +86,14 @@ const finalizarReporte = async (req, res) => {
         await reporteService.finalizarRescateAsignado(req.params.id, req.usuario.id, req.body, req.file);
         return res.status(200).json({ mensaje: 'Rescate finalizado con éxito' });
     } catch (error) {
+        // Limpiamos la evidencia en Cloudinary si falla finalizar
+        if (req.file && req.file.filename) {
+            try {
+                await cloudinary.uploader.destroy(req.file.filename);
+            } catch (cloudErr) {
+                console.error('Error al limpiar evidencia huérfana:', cloudErr);
+            }
+        }
         return res.status(error.statusCode || 500).json({ error: error.message || 'Error al finalizar el rescate' });
     }
 };
