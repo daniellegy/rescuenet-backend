@@ -2,8 +2,7 @@ const reporteService = require('../services/reporteService');
 
 const crearReporte = async (req, res) => {
     try {
-        const usuario_id = req.usuario.id;
-        const resultado = await reporteService.crearNuevoReporte(usuario_id, req.body, req.file);
+        const resultado = await reporteService.crearNuevoReporte(req.usuario, req.body, req.file);
         return res.status(201).json({ mensaje: 'Reporte creado', ...resultado });
     } catch (error) {
         const status = error.statusCode || 500;
