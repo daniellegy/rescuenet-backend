@@ -87,11 +87,12 @@ const finalizarEstadoRescate = async (reporte_id, voluntario_id, detalles, evide
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+        // REEMPLAZO EXACTO DE NOTAS ADICIONALES POR LA CONCLUSIÓN DEL STEPPER
         const updateQuery = `
             UPDATE reportes 
             SET estado = 'Rescatado', costo_rescate = $3, destino_final = $4, condicion_rescate = $5,
                 notas_adicionales = CASE 
-                    WHEN $6::text IS NOT NULL AND $6::text <> '' THEN CONCAT(notas_adicionales, CHR(10), 'Conclusión: ', $6::text)
+                    WHEN $6::text IS NOT NULL AND $6::text <> '' THEN $6::text
                     ELSE notas_adicionales 
                 END,
                 actualizado_el = CURRENT_TIMESTAMP
