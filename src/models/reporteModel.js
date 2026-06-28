@@ -8,10 +8,8 @@ const crearReporteConFoto = async (datos) => {
     } = datos;
     
     const client = await pool.connect();
-
     try {
         await client.query('BEGIN');
-
         const insertReporteQuery = `
             INSERT INTO reportes (
                 usuario_reportador_id, ubicacion, especie, color_dominante, 
@@ -43,7 +41,6 @@ const crearReporteConFoto = async (datos) => {
             urgencia: urgencia || 'media',
             foto_url: url_archivo 
         };
-
     } catch (error) {
         await client.query('ROLLBACK');
         throw error;
@@ -53,7 +50,6 @@ const crearReporteConFoto = async (datos) => {
 };
 
 const obtenerHistorial = async (usuario_id) => {
-    // Añadidos los JOIN a usuarios
     const query = `
         SELECT 
             r.id, r.especie, r.color_dominante, r.sexo, r.edad_aprox, r.agresividad,
@@ -137,19 +133,43 @@ const actualizarEstadoReporte = async (reporte_id, voluntario_id, estado) => {
     return rows[0];
 };
 
-const finalizarEstadoRescate = async (reporte_id, voluntario_id) => {
+// NUEVA FUNCIÓN: Abortar Rescate
+const abortarRescate = async (reporte_id, voluntario_id) => {
     const query = `
         UPDATE reportes 
-        SET estado = 'Rescatado', actualizado_el = CURRENT_TIMESTAMP
+        SET estado = 'Nuevo', usuario_rescatista_id = NULL, actualizado_el = CURRENT_TIMESTAMP
         WHERE id = $1 AND usuario_rescatista_id = $2 AND estado = 'En_Proceso'
         RETURNING id;
     `;
     const { rows } = await pool.query(query, [reporte_id, voluntario_id]);
+    if (rows.length === 0) throw { statusCode: 404, message: 'Rescate no encontrado o no tienes permisos para abortarlo' };
+    return rows[0];
+};
+
+// ACTUALIZACIÓN: Recibe los datos del Stepper
+const finalizarEstadoRescate = async (reporte_id, voluntario_id, detalles) => {
+    const { costo, destino, condicion, conclusion } = detalles;
+    const query = `
+        UPDATE reportes 
+        SET estado = 'Rescatado', 
+            costo_rescate = $3,
+            destino_final = $4,
+            condicion_rescate = $5,
+            notas_adicionales = CASE 
+                WHEN $6::text IS NOT NULL AND $6::text <> '' THEN CONCAT(notas_adicionales, CHR(10), 'Conclusión del Rescate: ', $6::text)
+                ELSE notas_adicionales 
+            END,
+            actualizado_el = CURRENT_TIMESTAMP
+        WHERE id = $1 AND usuario_rescatista_id = $2 AND estado = 'En_Proceso'
+        RETURNING id;
+    `;
+    const { rows } = await pool.query(query, [reporte_id, voluntario_id, costo || 0, destino, condicion, conclusion]);
     if (rows.length === 0) throw { statusCode: 404, message: 'Rescate no encontrado o no tienes permisos' };
     return rows[0];
 };
 
 module.exports = { 
     crearReporteConFoto, obtenerHistorial, obtenerReportesActivos, 
-    verificarRescateActivo, obtenerMiRescateActivo, actualizarEstadoReporte, finalizarEstadoRescate 
+    verificarRescateActivo, obtenerMiRescateActivo, actualizarEstadoReporte, 
+    abortarRescate, finalizarEstadoRescate 
 };

@@ -44,9 +44,21 @@ const obtenerMiRescateActivo = async (req, res) => {
     try {
         const voluntario_id = req.usuario.id;
         const rescate = await reporteService.obtenerRescateAsignado(voluntario_id);
-        return res.status(200).json(rescate || null); // Puede devolver null si no hay rescate activo
+        return res.status(200).json(rescate || null);
     } catch (error) {
         return res.status(500).json({ error: 'Error al obtener tu rescate activo' });
+    }
+};
+
+const abortarReporte = async (req, res) => {
+    try {
+        const reporte_id = req.params.id;
+        const voluntario_id = req.usuario.id;
+        await reporteService.abortarRescateAsignado(reporte_id, voluntario_id);
+        return res.status(200).json({ mensaje: 'Rescate abortado, el reporte vuelve a estar activo.' });
+    } catch (error) {
+        const status = error.statusCode || 500;
+        return res.status(status).json({ error: error.message || 'Error al abortar el rescate' });
     }
 };
 
@@ -54,7 +66,8 @@ const finalizarReporte = async (req, res) => {
     try {
         const reporte_id = req.params.id;
         const voluntario_id = req.usuario.id;
-        await reporteService.finalizarRescateAsignado(reporte_id, voluntario_id);
+        const detalles = req.body; // Recibimos el payload del Stepper
+        await reporteService.finalizarRescateAsignado(reporte_id, voluntario_id, detalles);
         return res.status(200).json({ mensaje: 'Rescate finalizado con éxito' });
     } catch (error) {
         const status = error.statusCode || 500;
@@ -64,5 +77,5 @@ const finalizarReporte = async (req, res) => {
 
 module.exports = { 
     crearReporte, obtenerMisReportes, obtenerReportesActivos, 
-    aceptarReporte, obtenerMiRescateActivo, finalizarReporte 
+    aceptarReporte, obtenerMiRescateActivo, abortarReporte, finalizarReporte 
 };

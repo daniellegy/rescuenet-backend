@@ -26,7 +26,7 @@ const crearNuevoReporte = async (usuario, body, file) => {
     } = body;
 
     const datosReporte = {
-        usuario_id: usuario.id, // Sacamos el ID del objeto usuario
+        usuario_id: usuario.id,
         latitud, longitud, especie, color_dominante,
         sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales,
         urgencia: urgencia || 'media',
@@ -49,12 +49,11 @@ const crearNuevoReporte = async (usuario, body, file) => {
                 latitud: parseFloat(latitud),
                 longitud: parseFloat(longitud),
                 foto_url: resultado.foto_url,
-                // CORRECCIÓN: Inyectamos el nombre de quien reporta y la fecha exacta actual
                 nombre_reportador: usuario.nombre_completo,
                 fecha_creacion: new Date().toISOString()
             });
 
-            const emoji = urgencia === 'alta' ? '🔴' : urgencia === 'media' ? '🟠' : '🟡';
+            const emoji = urgencia === 'alta' ? '🚨' : urgencia === 'media' ? '⚠️' : '🐾';
             const mensajePayload = {
                 notification: {
                     title: `${emoji} Emergencia de Rescate (${urgencia.toUpperCase()})`,
@@ -82,7 +81,6 @@ const obtenerActivos = async () => {
 };
 
 const aceptarRescate = async (reporte_id, voluntario_id) => {
-    // 1. REGLA DE NEGOCIO: Bloquear si ya tiene un caso en proceso
     const rescateOcupado = await reporteModel.verificarRescateActivo(voluntario_id);
     if (rescateOcupado) {
         throw { statusCode: 403, message: 'Ya tienes un caso en proceso. Finalízalo antes de aceptar otro.' };
@@ -94,11 +92,15 @@ const obtenerRescateAsignado = async (voluntario_id) => {
     return await reporteModel.obtenerMiRescateActivo(voluntario_id);
 };
 
-const finalizarRescateAsignado = async (reporte_id, voluntario_id) => {
-    await reporteModel.finalizarEstadoRescate(reporte_id, voluntario_id);
+const abortarRescateAsignado = async (reporte_id, voluntario_id) => {
+    return await reporteModel.abortarRescate(reporte_id, voluntario_id);
+};
+
+const finalizarRescateAsignado = async (reporte_id, voluntario_id, detalles) => {
+    return await reporteModel.finalizarEstadoRescate(reporte_id, voluntario_id, detalles);
 };
 
 module.exports = { 
     crearNuevoReporte, obtenerMisReportes, obtenerActivos, 
-    aceptarRescate, obtenerRescateAsignado, finalizarRescateAsignado 
+    aceptarRescate, obtenerRescateAsignado, abortarRescateAsignado, finalizarRescateAsignado 
 };
