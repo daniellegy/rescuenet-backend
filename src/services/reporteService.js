@@ -28,7 +28,8 @@ const crearNuevoReporte = async (usuario, body, file) => {
     const datosReporte = {
         usuario_id: usuario.id,
         latitud, longitud, especie, color_dominante,
-        sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales,
+        sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, 
+        notas_adicionales: notas_adicionales || '', // Se permite vacío por la eliminación de la redundancia
         urgencia: urgencia || 'media',
         url_archivo: file.path,
         referencias: referencias || null,
@@ -45,7 +46,7 @@ const crearNuevoReporte = async (usuario, body, file) => {
                 edad_aprox: edad_aprox || 'Cachorro', tamano: tamano || 'Pequeño',
                 agresividad: agresividad || 1, raza_aprox: raza_aprox || 'Desconocida',
                 caracteristicas_especiales: caracteristicas_especiales || 'Ninguna',
-                notas_adicionales: notas_adicionales || 'Sin notas',
+                notas_adicionales: notas_adicionales || '',
                 urgencia: urgencia || 'media',
                 estado: 'Nuevo',
                 latitud: parseFloat(latitud),
@@ -85,7 +86,7 @@ const obtenerActivos = async (limit, offset) => {
 };
 
 const aceptarRescate = async (reporte_id, voluntario_id) => {
-    const rescateOcupado = await pool.query; // se mantiene estructura original mediante modelo
+    // Corrección: Se eliminó el "await pool.query" que causaba el ReferenceError.
     const rescateOcupadoRes = await reporteModel.verificarRescateActivo(voluntario_id);
     if (rescateOcupadoRes) {
         throw { statusCode: 403, message: 'Ya tienes un caso en proceso. Finalízalo antes de aceptar otro.' };
