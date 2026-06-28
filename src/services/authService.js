@@ -9,10 +9,19 @@ const lanzarError = (mensaje, statusCode) => {
     throw error;
 };
 
+// Expresión Regular Oficial para CURP
+const curpRegex = /^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z\d]\d$/;
+
 const registrarUsuario = async (datos) => {
     const { nombre_completo, telefono, email, password, rol_id, curp } = datos;
     if (!nombre_completo || !telefono || !email || !password || !rol_id) {
         lanzarError('Faltan campos obligatorios', 400);
+    }
+
+    if (rol_id === 2) {
+        if (!curp || !curpRegex.test(curp)) {
+            lanzarError('El CURP proporcionado no tiene un formato válido.', 400);
+        }
     }
 
     const usuarioExistente = await usuarioModel.buscarPorEmail(email);
@@ -56,7 +65,12 @@ const actualizarPerfil = async (usuario_id, datos) => {
     if (telefono && !/^[0-9\-()+\s]{10,15}$/.test(telefono)) lanzarError('Formato de teléfono inválido', 400);
     if (email && !/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email)) lanzarError('Formato de correo inválido', 400);
     if (role && role !== 1 && role !== 2) lanzarError('Acción denegada. Rol inválido.', 403);
-    if (curp && curp.trim().length !== 18) lanzarError('El CURP proporcionado es inválido.', 400);
+    
+    if (curp) {
+        if (!curpRegex.test(curp.trim().toUpperCase())) {
+            lanzarError('El formato del CURP proporcionado es inválido.', 400);
+        }
+    }
 
     const client = await pool.connect();
     try {
