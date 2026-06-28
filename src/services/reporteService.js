@@ -22,7 +22,7 @@ const crearNuevoReporte = async (usuario, body, file) => {
 
     const { 
         latitud, longitud, especie, color_dominante, 
-        sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia
+        sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, referencias, radio
     } = body;
 
     const datosReporte = {
@@ -30,7 +30,9 @@ const crearNuevoReporte = async (usuario, body, file) => {
         latitud, longitud, especie, color_dominante,
         sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales,
         urgencia: urgencia || 'media',
-        url_archivo: file.path 
+        url_archivo: file.path,
+        referencias: referencias || null,
+        radio: parseInt(radio, 10) || 500
     };
 
     const resultado = await reporteModel.crearReporteConFoto(datosReporte);
@@ -50,7 +52,9 @@ const crearNuevoReporte = async (usuario, body, file) => {
                 longitud: parseFloat(longitud),
                 foto_url: resultado.foto_url,
                 nombre_reportador: usuario.nombre_completo,
-                fecha_creacion: new Date().toISOString()
+                fecha_creacion: new Date().toISOString(),
+                referencias: referencias || 'Sin referencias',
+                radio: parseInt(radio, 10) || 500
             });
 
             const emoji = urgencia === 'alta' ? '🚨' : urgencia === 'media' ? '⚠️' : '🐾';
@@ -81,8 +85,9 @@ const obtenerActivos = async (limit, offset) => {
 };
 
 const aceptarRescate = async (reporte_id, voluntario_id) => {
-    const rescateOcupado = await reporteModel.verificarRescateActivo(voluntario_id);
-    if (rescateOcupado) {
+    const rescateOcupado = await pool.query; // se mantiene estructura original mediante modelo
+    const rescateOcupadoRes = await reporteModel.verificarRescateActivo(voluntario_id);
+    if (rescateOcupadoRes) {
         throw { statusCode: 403, message: 'Ya tienes un caso en proceso. Finalízalo antes de aceptar otro.' };
     }
     await reporteModel.actualizarEstadoReporte(reporte_id, voluntario_id, 'En_Proceso');
