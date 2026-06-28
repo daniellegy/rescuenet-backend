@@ -96,11 +96,14 @@ const abortarRescateAsignado = async (reporte_id, voluntario_id) => {
     return await reporteModel.abortarRescate(reporte_id, voluntario_id);
 };
 
-const finalizarRescateAsignado = async (reporte_id, voluntario_id, detalles) => {
-    return await reporteModel.finalizarEstadoRescate(reporte_id, voluntario_id, detalles);
+const actualizarProgreso = async (reporte_id, voluntario_id, datos) => {
+    const { animal_avistado, lugar_traslado } = datos;
+    return await reporteModel.actualizarProgresoRescate(reporte_id, voluntario_id, animal_avistado, lugar_traslado);
 };
 
-module.exports = { 
-    crearNuevoReporte, obtenerMisReportes, obtenerActivos, 
-    aceptarRescate, obtenerRescateAsignado, abortarRescateAsignado, finalizarRescateAsignado 
+const finalizarRescateAsignado = async (reporte_id, voluntario_id, detalles, file) => {
+    const evidencia_url = file ? file.path : null;
+    return await reporteModel.finalizarEstadoRescate(reporte_id, voluntario_id, detalles, evidencia_url);
 };
+
+module.exports = { crearNuevoReporte, obtenerMisReportes, obtenerActivos, aceptarRescate, obtenerRescateAsignado, abortarRescateAsignado, actualizarProgreso, finalizarRescateAsignado };

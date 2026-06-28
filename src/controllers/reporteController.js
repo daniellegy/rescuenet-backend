@@ -52,30 +52,29 @@ const obtenerMiRescateActivo = async (req, res) => {
 
 const abortarReporte = async (req, res) => {
     try {
-        const reporte_id = req.params.id;
-        const voluntario_id = req.usuario.id;
-        await reporteService.abortarRescateAsignado(reporte_id, voluntario_id);
+        await reporteService.abortarRescateAsignado(req.params.id, req.usuario.id);
         return res.status(200).json({ mensaje: 'Rescate abortado, el reporte vuelve a estar activo.' });
     } catch (error) {
-        const status = error.statusCode || 500;
-        return res.status(status).json({ error: error.message || 'Error al abortar el rescate' });
+        return res.status(error.statusCode || 500).json({ error: error.message || 'Error al abortar el rescate' });
+    }
+};
+
+const actualizarProgreso = async (req, res) => {
+    try {
+        await reporteService.actualizarProgreso(req.params.id, req.usuario.id, req.body);
+        return res.status(200).json({ mensaje: 'Progreso actualizado' });
+    } catch (error) {
+        return res.status(error.statusCode || 500).json({ error: error.message || 'Error al actualizar progreso' });
     }
 };
 
 const finalizarReporte = async (req, res) => {
     try {
-        const reporte_id = req.params.id;
-        const voluntario_id = req.usuario.id;
-        const detalles = req.body; // Recibimos el payload del Stepper
-        await reporteService.finalizarRescateAsignado(reporte_id, voluntario_id, detalles);
+        await reporteService.finalizarRescateAsignado(req.params.id, req.usuario.id, req.body, req.file);
         return res.status(200).json({ mensaje: 'Rescate finalizado con éxito' });
     } catch (error) {
-        const status = error.statusCode || 500;
-        return res.status(status).json({ error: error.message || 'Error al finalizar el rescate' });
+        return res.status(error.statusCode || 500).json({ error: error.message || 'Error al finalizar el rescate' });
     }
 };
 
-module.exports = { 
-    crearReporte, obtenerMisReportes, obtenerReportesActivos, 
-    aceptarReporte, obtenerMiRescateActivo, abortarReporte, finalizarReporte 
-};
+module.exports = { crearReporte, obtenerMisReportes, obtenerReportesActivos, aceptarReporte, obtenerMiRescateActivo, abortarReporte, actualizarProgreso, finalizarReporte };
