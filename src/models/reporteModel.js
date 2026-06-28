@@ -113,4 +113,14 @@ const finalizarEstadoRescate = async (reporte_id, voluntario_id, detalles, evide
     }
 };
 
-module.exports = { crearReporteConFoto, obtenerHistorial, obtenerReportesActivos, verificarRescateActivo, obtenerMiRescateActivo, actualizarEstadoReporte, abortarRescate, actualizarProgresoRescate, finalizarEstadoRescate };
+module.exports = { 
+    crearReporteConFoto, 
+    obtenerHistorial, 
+    obtenerReportesActivos, 
+    verificarRescateActivo, 
+    obtenerMiRescateActivo, 
+    actualizarEstadoReporte, 
+    abortarRescate, 
+    actualizarProgresoRescate, 
+    finalizarEstadoRescate 
+};

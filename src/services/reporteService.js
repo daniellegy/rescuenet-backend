@@ -3,6 +3,7 @@ const path = require('path');
 const { initializeApp, cert, getApps } = require('firebase-admin/app');
 const { getMessaging } = require('firebase-admin/messaging');
 
+// Inicialización de Firebase
 try {
     const rutaKey = path.join(process.cwd(), 'firebase-key.json');
     const serviceAccount = require(rutaKey);
@@ -29,7 +30,7 @@ const crearNuevoReporte = async (usuario, body, file) => {
         usuario_id: usuario.id,
         latitud, longitud, especie, color_dominante,
         sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, 
-        notas_adicionales: notas_adicionales || '', // Se permite vacío por la eliminación de la redundancia
+        notas_adicionales: notas_adicionales || '', 
         urgencia: urgencia || 'media',
         url_archivo: file.path,
         referencias: referencias || null,
@@ -86,7 +87,8 @@ const obtenerActivos = async (limit, offset) => {
 };
 
 const aceptarRescate = async (reporte_id, voluntario_id) => {
-    // Corrección: Se eliminó el "await pool.query" que causaba el ReferenceError.
+    // Aquí es donde ocurría tu error. Ahora el servicio llama limpiamente al modelo.
+    // El modelo es el encargado de interactuar con el 'pool' de la DB.
     const rescateOcupadoRes = await reporteModel.verificarRescateActivo(voluntario_id);
     if (rescateOcupadoRes) {
         throw { statusCode: 403, message: 'Ya tienes un caso en proceso. Finalízalo antes de aceptar otro.' };
@@ -112,4 +114,13 @@ const finalizarRescateAsignado = async (reporte_id, voluntario_id, detalles, fil
     return await reporteModel.finalizarEstadoRescate(reporte_id, voluntario_id, detalles, evidencia_url);
 };
 
-module.exports = { crearNuevoReporte, obtenerMisReportes, obtenerActivos, aceptarRescate, obtenerRescateAsignado, abortarRescateAsignado, actualizarProgreso, finalizarRescateAsignado };
+module.exports = { 
+    crearNuevoReporte, 
+    obtenerMisReportes, 
+    obtenerActivos, 
+    aceptarRescate, 
+    obtenerRescateAsignado, 
+    abortarRescateAsignado, 
+    actualizarProgreso, 
+    finalizarRescateAsignado 
+};
