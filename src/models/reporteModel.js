@@ -61,6 +61,7 @@ const obtenerHistorial = async (usuario_id) => {
             r.usuario_rescatista_id, r.usuario_reportador_id,
             ST_Y(r.ubicacion::geometry) AS latitud, ST_X(r.ubicacion::geometry) AS longitud,
             m.url_archivo AS foto_url,
+            r.creado_el AS fecha_creacion,
             u_rep.nombre_completo AS nombre_reportador,
             u_resc.nombre_completo AS nombre_rescatista
         FROM reportes r
@@ -82,6 +83,7 @@ const obtenerReportesActivos = async () => {
             r.usuario_rescatista_id, r.usuario_reportador_id,
             ST_Y(r.ubicacion::geometry) AS latitud, ST_X(r.ubicacion::geometry) AS longitud,
             m.url_archivo AS foto_url,
+            r.creado_el AS fecha_creacion,
             u_rep.nombre_completo AS nombre_reportador,
             u_resc.nombre_completo AS nombre_rescatista
         FROM reportes r
@@ -109,6 +111,7 @@ const obtenerMiRescateActivo = async (voluntario_id) => {
             r.usuario_rescatista_id, r.usuario_reportador_id,
             ST_Y(r.ubicacion::geometry) AS latitud, ST_X(r.ubicacion::geometry) AS longitud,
             m.url_archivo AS foto_url,
+            r.creado_el AS fecha_creacion,
             u_rep.nombre_completo AS nombre_reportador,
             u_resc.nombre_completo AS nombre_rescatista
         FROM reportes r

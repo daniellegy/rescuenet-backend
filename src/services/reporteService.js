@@ -17,7 +17,7 @@ try {
     console.error("Fallo en la inicialización de Firebase:", error);
 }
 
-const crearNuevoReporte = async (usuario_id, body, file) => {
+const crearNuevoReporte = async (usuario, body, file) => {
     if (!file) throw { statusCode: 400, message: 'La fotografía es obligatoria' };
 
     const { 
@@ -25,12 +25,9 @@ const crearNuevoReporte = async (usuario_id, body, file) => {
         sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia
     } = body;
 
-    if (!latitud || !longitud || !especie || !color_dominante) {
-        throw { statusCode: 400, message: 'Faltan datos obligatorios' };
-    }
-
     const datosReporte = {
-        usuario_id, latitud, longitud, especie, color_dominante,
+        usuario_id: usuario.id, // Sacamos el ID del objeto usuario
+        latitud, longitud, especie, color_dominante,
         sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales,
         urgencia: urgencia || 'media',
         url_archivo: file.path 
@@ -51,7 +48,10 @@ const crearNuevoReporte = async (usuario_id, body, file) => {
                 estado: 'Nuevo',
                 latitud: parseFloat(latitud),
                 longitud: parseFloat(longitud),
-                foto_url: resultado.foto_url
+                foto_url: resultado.foto_url,
+                // CORRECCIÓN: Inyectamos el nombre de quien reporta y la fecha exacta actual
+                nombre_reportador: usuario.nombre_completo,
+                fecha_creacion: new Date().toISOString()
             });
 
             const emoji = urgencia === 'alta' ? '🔴' : urgencia === 'media' ? '🟠' : '🟡';
