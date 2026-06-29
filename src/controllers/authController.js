@@ -1,5 +1,5 @@
 const authService = require('../services/authService');
-const usuarioModel = require('../models/usuarioModel'); // Importamos el modelo
+const usuarioModel = require('../models/usuarioModel');
 
 const registrarUsuario = async (req, res) => {
     try {
@@ -43,11 +43,12 @@ const actualizarPerfil = async (req, res) => {
     try {
         const perfil = await authService.actualizarPerfil(req.usuario.id, req.body);
         
-        // Atrapamos campos extra (radio, fcm) si vienen en la petición
         const { radio_notificaciones, fcm_token } = req.body;
         if (radio_notificaciones !== undefined || fcm_token !== undefined) {
              const extras = await usuarioModel.actualizarPreferencias(req.usuario.id, radio_notificaciones, fcm_token);
              perfil.radio_notificaciones = extras.radio_notificaciones || perfil.radio_notificaciones;
+             // MODIFICADO: Mapea de vuelta el fcm_token actualizado (o eliminado) para sincronizar el estado de la app
+             perfil.fcm_token = extras.fcm_token !== undefined ? extras.fcm_token : perfil.fcm_token;
         }
 
         return res.status(200).json({ mensaje: 'Perfil actualizado exitosamente', usuario: perfil });

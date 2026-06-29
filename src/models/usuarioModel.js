@@ -18,8 +18,8 @@ const crearUsuario = async (rol_id, nombre_completo, telefono, email, passwordHa
 };
 
 const obtenerPerfilPorId = async (id) => {
-    // Se incluye radio_notificaciones
-    const query = 'SELECT id, rol_id AS role, nombre_completo, telefono, email, curp, radio_notificaciones FROM usuarios WHERE id = $1';
+    // MODIFICADO: Ahora se incluye fcm_token para conocer el estado actual en la UI de Flutter
+    const query = 'SELECT id, rol_id AS role, nombre_completo, telefono, email, curp, radio_notificaciones, fcm_token FROM usuarios WHERE id = $1';
     const result = await pool.query(query, [id]);
     return result.rows[0] || null;
 };
@@ -42,13 +42,13 @@ const actualizarPerfil = async (client, id, telefono, email, role, curp) => {
     return result.rows[0] || null;
 };
 
-// NUEVA FUNCIÓN: Actualiza campos extra sin romper el authService existente
+// MODIFICADO: Permite limpiar el fcm_token enviando explícitamente 'CLEAR' desde la app
 const actualizarPreferencias = async (id, radio, fcm_token) => {
     const query = `
         UPDATE usuarios 
         SET 
             radio_notificaciones = COALESCE($1, radio_notificaciones),
-            fcm_token = COALESCE($2, fcm_token)
+            fcm_token = CASE WHEN $2 = 'CLEAR' THEN NULL ELSE COALESCE($2, fcm_token) END
         WHERE id = $3
         RETURNING radio_notificaciones, fcm_token;
     `;
@@ -56,7 +56,6 @@ const actualizarPreferencias = async (id, radio, fcm_token) => {
     return rows[0] || {};
 };
 
-// NUEVA FUNCIÓN: Guarda la última ubicación del usuario al ver los reportes
 const actualizarUltimaUbicacion = async (id, lat, lng) => {
     const query = `
         UPDATE usuarios 
@@ -66,13 +65,13 @@ const actualizarUltimaUbicacion = async (id, lat, lng) => {
     await pool.query(query, [parseFloat(lng), parseFloat(lat), id]);
 };
 
-// NUEVA FUNCIÓN: Extrae tokens de voluntarios dentro de su radio elegido
 const obtenerTokensVoluntariosCercanos = async (lat, lng) => {
     const query = `
         SELECT fcm_token 
         FROM usuarios 
         WHERE rol_id = 2 
         AND fcm_token IS NOT NULL
+        AND fcm_token <> ''
         AND ultima_ubicacion IS NOT NULL
         AND ST_DWithin(ultima_ubicacion::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, radio_notificaciones * 1000)
     `;
