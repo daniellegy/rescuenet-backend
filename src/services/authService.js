@@ -30,7 +30,17 @@ const registrarUsuario = async (datos) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    const nuevoUsuario = await usuarioModel.crearUsuario(rol_id, nombre_completo, telefono, email, passwordHash, curp);
+    let nuevoUsuario;
+    try {
+        nuevoUsuario = await usuarioModel.crearUsuario(rol_id, nombre_completo, telefono, email, passwordHash, curp);
+    } catch (error) {
+        // Captura explícita de duplicidad de CURP lanzada por PostgreSQL
+        if (error.code === '23505' && error.constraint === 'usuarios_curp_key') {
+            lanzarError('El CURP ingresado ya está registrado en otra cuenta de voluntario.', 409);
+        }
+        throw error;
+    }
+
     const token = generarToken(nuevoUsuario);
 
     return { token, usuario: { id: nuevoUsuario.id, rol_id: nuevoUsuario.rol_id, nombre: nuevoUsuario.nombre_completo } };
@@ -83,6 +93,9 @@ const actualizarPerfil = async (usuario_id, datos) => {
         await client.query('ROLLBACK');
         if (error.code === '23505' && error.constraint === 'usuarios_email_key') {
             lanzarError('El correo electrónico ya está en uso por otra cuenta.', 409);
+        }
+        if (error.code === '23505' && error.constraint === 'usuarios_curp_key') {
+            lanzarError('El CURP ingresado ya está registrado en otra cuenta.', 409);
         }
         throw error;
     } finally {
