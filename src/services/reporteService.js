@@ -1,5 +1,5 @@
 const reporteModel = require('../models/reporteModel');
-const usuarioModel = require('../models/usuarioModel'); // Requerimos el modelo para sacar los tokens
+const usuarioModel = require('../models/usuarioModel'); 
 const path = require('path');
 const { initializeApp, cert, getApps } = require('firebase-admin/app');
 const { getMessaging } = require('firebase-admin/messaging');
@@ -59,7 +59,6 @@ const crearNuevoReporte = async (usuario, body, file) => {
                 radio: parseInt(radio, 10) || 500
             });
 
-            // OBTENEMOS SÓLO LOS TOKENS QUE ESTÁN DENTRO DE SU RADIO CONFIGURADO
             const tokens = await usuarioModel.obtenerTokensVoluntariosCercanos(latitud, longitud);
 
             if (tokens.length > 0) {
@@ -73,7 +72,6 @@ const crearNuevoReporte = async (usuario, body, file) => {
                     data: { reporte: reporteString }
                 };
                 
-                // MULTICAST: Firebase envía notificaciones precisas a esta lista de dispositivos
                 await getMessaging().sendEachForMulticast({
                     tokens: tokens,
                     notification: mensajePayload.notification,
@@ -93,7 +91,6 @@ const obtenerMisReportes = async (usuario_id) => {
     return await reporteModel.obtenerHistorial(usuario_id);
 };
 
-// Modificado para pasar las coordenadas geográficas al modelo
 const obtenerActivos = async (limit, offset, usuario_id, lat, lng) => {
     return await reporteModel.obtenerReportesActivos(limit, offset, usuario_id, lat, lng);
 };
@@ -115,7 +112,10 @@ const abortarRescateAsignado = async (reporte_id, voluntario_id) => {
 };
 
 const actualizarProgreso = async (reporte_id, voluntario_id, datos) => {
-    const { animal_avistado, lugar_traslado } = datos;
+    // CORRECCIÓN: Parseo explícito para evitar crashes de 'pg' por variables undefined
+    const animal_avistado = datos.animal_avistado !== undefined ? datos.animal_avistado : null;
+    const lugar_traslado = datos.lugar_traslado !== undefined ? datos.lugar_traslado : null;
+    
     return await reporteModel.actualizarProgresoRescate(reporte_id, voluntario_id, animal_avistado, lugar_traslado);
 };
 
