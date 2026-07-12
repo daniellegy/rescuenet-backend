@@ -1,5 +1,6 @@
 const reporteModel = require('../models/reporteModel');
 const usuarioModel = require('../models/usuarioModel'); 
+const canalModel = require('../models/canalModel');
 const path = require('path');
 const { initializeApp, cert, getApps } = require('firebase-admin/app');
 const { getMessaging } = require('firebase-admin/messaging');
@@ -23,7 +24,7 @@ const crearNuevoReporte = async (usuario, body, file) => {
 
     const { 
         latitud, longitud, especie, color_dominante, 
-        sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, referencias, radio
+        sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, referencias, radio, activarCanal
     } = body;
 
     const datosReporte = {
@@ -34,7 +35,9 @@ const crearNuevoReporte = async (usuario, body, file) => {
         urgencia: urgencia || 'media',
         url_archivo: file.path,
         referencias: referencias || null,
-        radio: parseInt(radio, 10) || 500
+        radio: parseInt(radio, 10) || 500,
+        activar_canal: activarCanal === true || activarCanal === 'true'
+
     };
 
     const resultado = await reporteModel.crearReporteConFoto(datosReporte);
@@ -63,7 +66,20 @@ const crearNuevoReporte = async (usuario, body, file) => {
 
             if (tokens.length > 0) {
                 const emoji = urgencia === 'alta' ? '🚨' : urgencia === 'media' ? '⚠️' : '🐾';
-                const mensajePayload = {
+                await getMessaging().sendEachForMulticast({
+                    tokens: tokens,
+                    notification: {
+                        title: `${emoji} Emergencia de Rescate (${urgencia.toUpperCase()})`,
+                        body: `Se reportó un ${especie} (${color_dominante}) que necesita ayuda cerca de ti.`
+                    },
+                    data: { 
+                        reporte: reporteString 
+                    },
+                    android: { 
+                        priority: 'high' 
+                    }
+                });
+                /*const mensajePayload = {
                     notification: {
                         title: `${emoji} Emergencia de Rescate (${urgencia.toUpperCase()})`,
                         body: `Se reportó un ${especie} (${color_dominante}) que necesita ayuda cerca de ti.`
@@ -77,7 +93,8 @@ const crearNuevoReporte = async (usuario, body, file) => {
                     notification: mensajePayload.notification,
                     data: mensajePayload.data,
                     android: mensajePayload.android
-                });
+                });*/
+
             }
         }
     } catch (pushError) {
@@ -101,6 +118,7 @@ const aceptarRescate = async (reporte_id, voluntario_id) => {
         throw { statusCode: 403, message: 'Ya tienes un caso en proceso. Finalízalo antes de aceptar otro.' };
     }
     await reporteModel.actualizarEstadoReporte(reporte_id, voluntario_id, 'En_Proceso');
+    await canalModel.activarCanalSiCorresponde(reporte_id);
 };
 
 const obtenerRescateAsignado = async (voluntario_id) => {
@@ -108,7 +126,9 @@ const obtenerRescateAsignado = async (voluntario_id) => {
 };
 
 const abortarRescateAsignado = async (reporte_id, voluntario_id) => {
-    return await reporteModel.abortarRescate(reporte_id, voluntario_id);
+    const resultado = await reporteModel.abortarRescate(reporte_id, voluntario_id);
+    await canalModel.reactivarCanalSiCorresponde(reporte_id);
+    return resultado;
 };
 
 const actualizarProgreso = async (reporte_id, voluntario_id, datos) => {
@@ -121,7 +141,9 @@ const actualizarProgreso = async (reporte_id, voluntario_id, datos) => {
 
 const finalizarRescateAsignado = async (reporte_id, voluntario_id, detalles, file) => {
     const evidencia_url = file ? file.path : null;
-    return await reporteModel.finalizarEstadoRescate(reporte_id, voluntario_id, detalles, evidencia_url);
+    const resultado = await reporteModel.finalizarEstadoRescate(reporte_id, voluntario_id, detalles, evidencia_url);
+    await canalModel.cerrarCanal(reporte_id);
+    return resultado;
 };
 
 module.exports = { crearNuevoReporte, obtenerMisReportes, obtenerActivos, aceptarRescate, obtenerRescateAsignado, abortarRescateAsignado, actualizarProgreso, finalizarRescateAsignado };
