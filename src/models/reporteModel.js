@@ -1,12 +1,32 @@
 const pool = require('../config/database');
 
 const crearReporteConFoto = async (datos) => {
-    const { usuario_id, latitud, longitud, especie, color_dominante, sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, url_archivo, referencias, radio } = datos;
+    const { usuario_id, latitud, longitud, especie, color_dominante, sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, url_archivo, referencias, radio, activar_canal } = datos;
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        const insertReporteQuery = `INSERT INTO reportes (usuario_reportador_id, ubicacion, especie, color_dominante, sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, estado, referencias, radio) VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Nuevo', $14, $15) RETURNING id;`;
-        const resReporte = await client.query(insertReporteQuery, [usuario_id, parseFloat(longitud), parseFloat(latitud), especie, color_dominante, sexo || 'Desconocido', edad_aprox || 'Cachorro', tamano || null, agresividad || 1, raza_aprox || null, caracteristicas_especiales || null, notas_adicionales || null, urgencia || 'media', referencias || null, radio || 500]);
+        const insertReporteQuery = `INSERT INTO reportes (usuario_reportador_id, ubicacion, especie, color_dominante, sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, estado, referencias, radio, canal_comunicacion_habilitado ) VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Nuevo', $14, $15, $16) RETURNING id;`;
+        
+        // CORRECCIÓN: Colocamos activar_canal dentro del arreglo para asignarlo correctamente a $16
+        const resReporte = await client.query(insertReporteQuery, [
+            usuario_id, 
+            parseFloat(longitud), 
+            parseFloat(latitud), 
+            especie, 
+            color_dominante, 
+            sexo || 'Desconocido', 
+            edad_aprox || 'Cachorro', 
+            tamano || null, 
+            agresividad || 1, 
+            raza_aprox || null, 
+            caracteristicas_especiales || null, 
+            notas_adicionales || null, 
+            urgencia || 'media', 
+            referencias || null, 
+            radio || 500,
+            activar_canal === true
+        ]);
+        
         const reporte_id = resReporte.rows[0].id;
         await client.query(`INSERT INTO reporte_multimedia (reporte_id, tipo, url_archivo) VALUES ($1, 'Foto_Animal', $2);`, [reporte_id, url_archivo]);
         await client.query('COMMIT');
@@ -23,6 +43,7 @@ const _baseSelectQuery = `
     SELECT 
         r.id, r.especie, r.color_dominante, r.sexo, r.edad_aprox, r.agresividad, r.tamano, r.raza_aprox, r.caracteristicas_especiales, r.notas_adicionales, r.urgencia, r.estado, r.usuario_rescatista_id, r.usuario_reportador_id,
         r.animal_avistado, r.lugar_traslado, r.destino_final, r.costo_rescate, r.condicion_rescate, r.referencias, r.radio, r.conclusion,
+        r.canal_comunicacion_habilitado, r.canal_comunicacion_estado,
         ST_Y(r.ubicacion::geometry) AS latitud, ST_X(r.ubicacion::geometry) AS longitud,
         m1.url_archivo AS foto_url, m2.url_archivo AS foto_evidencia_url,
         r.creado_el AS fecha_creacion, u_rep.nombre_completo AS nombre_reportador, u_resc.nombre_completo AS nombre_rescatista
@@ -107,7 +128,6 @@ const finalizarEstadoRescate = async (reporte_id, voluntario_id, detalles, evide
     try {
         await client.query('BEGIN');
         
-        // MODIFICADO: Eliminado el CASE WHEN de notas_adicionales, se asigna $6 directo a conclusion
         const updateQuery = `
             UPDATE reportes 
             SET estado = 'Rescatado', costo_rescate = $3, destino_final = $4, condicion_rescate = $5,
