@@ -1,4 +1,5 @@
 const canalService = require('../services/canalService');
+const socketIo = require('../config/socket'); // <--- Importamos la instancia de Socket
 
 const obtenerEstadoCanal = async (req, res) => {
     try {
@@ -20,7 +21,12 @@ const listarMensajesCanal = async (req, res) => {
 
 const enviarMensajeCanal = async (req, res) => {
     try {
+        // 1. Guardamos el mensaje en la base de datos
         const mensaje = await canalService.enviarMensaje(req.params.id, req.usuario.id, req.body.contenido);
+        
+        // 2. Emitimos el mensaje en tiempo real a la "sala" del reporte
+        socketIo.getIO().to(`canal_${req.params.id}`).emit('nuevo_mensaje', mensaje);
+
         return res.status(201).json(mensaje);
     } catch (error) {
         return res.status(error.statusCode || 500).json({ error: error.message || 'Error al enviar el mensaje' });
@@ -36,7 +42,6 @@ const cerrarCanalManual = async (req, res) => {
     }
 };
 
-// ===== AGREGAR esta función completa ===== //
 const activarCanalManual = async (req, res) => {
     try {
         const resultado = await canalService.activarCanalManual(req.params.id, req.usuario.id);
@@ -45,6 +50,5 @@ const activarCanalManual = async (req, res) => {
         return res.status(error.statusCode || 500).json({ error: error.message || 'Error al activar el canal' });
     }
 };
-// =============================================== //
 
-module.exports = { obtenerEstadoCanal, listarMensajesCanal, enviarMensajeCanal, cerrarCanalManual, activarCanalManual }; // ===== MODIFICAR =====
+module.exports = { obtenerEstadoCanal, listarMensajesCanal, enviarMensajeCanal, cerrarCanalManual, activarCanalManual };

@@ -1,7 +1,9 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const http = require('http'); // 1. Importamos el módulo HTTP nativo de Node.js
 const pool = require('./src/config/database');
+const socketConfig = require('./src/config/socket'); // 2. Importamos tu nueva configuración de WebSockets
 
 // Importar rutas
 const authRoutes = require('./src/routes/authRoutes');
@@ -31,6 +33,13 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`Servidor RescueNet ejecutándose en el puerto ${PORT}`);
+// 3. Creamos el servidor HTTP explícitamente y le inyectamos la app de Express
+const server = http.createServer(app);
+
+// 4. Inicializamos WebSockets enganchándolo a nuestro servidor HTTP
+socketConfig.init(server);
+
+// 5. Sustituimos app.listen por server.listen
+server.listen(PORT, () => {
+    console.log(`Servidor RescueNet ejecutándose en el puerto ${PORT} (con WebSockets habilitados)`);
 });

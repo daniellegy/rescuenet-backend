@@ -17,8 +17,6 @@ const obtenerEstadoCanal = async (reporte_id) => {
     return rows[0] || null;
 };
 
-
-// Se llama cuando un voluntario acepta el rescate (estado pasa a 'En_Proceso')
 const activarCanalSiCorresponde = async (reporte_id) => {
     const { rows } = await pool.query(
         `UPDATE reportes
@@ -30,11 +28,6 @@ const activarCanalSiCorresponde = async (reporte_id) => {
     return rows.length > 0;
 };
 
-// =========================================================================
-// ZONA A: NUEVAS FUNCIONES PARA LA ACTIVACIÓN POSTERIOR MANUAL DEL CANAL
-// =========================================================================
-
-// Verifica si el usuario actual es el que reportó inicialmente el caso
 const esReportador = async (reporte_id, usuario_id) => {
     const { rows } = await pool.query(
         `SELECT 1 FROM reportes WHERE id = $1 AND usuario_reportador_id = $2;`,
@@ -43,8 +36,6 @@ const esReportador = async (reporte_id, usuario_id) => {
     return rows.length > 0;
 };
 
-// Fuerza la habilitación del canal si el reportante dijo "no" al inicio.
-// Si el reporte ya está 'En_Proceso', cambia el estado del canal a 'activo' y marca la fecha de apertura.
 const activarCanalManualmente = async (reporte_id) => {
     const { rows } = await pool.query(
         `UPDATE reportes
@@ -58,9 +49,6 @@ const activarCanalManualmente = async (reporte_id) => {
     return rows.length > 0;
 };
 
-// =========================================================================
-
-// Se llama cuando el rescate se finaliza ('Rescatado') o se aborta (vuelve a 'Nuevo')
 const cerrarCanal = async (reporte_id) => {
     const { rows } = await pool.query(
         `UPDATE reportes
@@ -72,7 +60,6 @@ const cerrarCanal = async (reporte_id) => {
     return rows.length > 0;
 };
 
-// Reabre el canal si se aborta un rescate y el reportador lo había pedido originalmente
 const reactivarCanalSiCorresponde = async (reporte_id) => {
     const { rows } = await pool.query(
         `UPDATE reportes
@@ -84,10 +71,16 @@ const reactivarCanalSiCorresponde = async (reporte_id) => {
     return rows.length > 0;
 };
 
+// MODIFICACIÓN: Inserción y Join simultáneo para WebSockets
 const crearMensaje = async (reporte_id, autor_id, contenido) => {
     const { rows } = await pool.query(
-        `INSERT INTO canal_mensajes (reporte_id, autor_id, contenido) VALUES ($1, $2, $3)
-         RETURNING id, reporte_id, autor_id, contenido, creado_el;`,
+        `WITH insertado AS (
+            INSERT INTO canal_mensajes (reporte_id, autor_id, contenido) VALUES ($1, $2, $3)
+            RETURNING id, reporte_id, autor_id, contenido, creado_el
+         )
+         SELECT i.*, u.nombre_completo AS nombre_autor
+         FROM insertado i
+         JOIN usuarios u ON i.autor_id = u.id;`,
         [reporte_id, autor_id, contenido]
     );
     return rows[0];
