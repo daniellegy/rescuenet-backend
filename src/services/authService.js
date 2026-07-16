@@ -52,6 +52,10 @@ const iniciarSesion = async (email, password) => {
     const usuario = await usuarioModel.buscarPorEmail(email);
     if (!usuario) lanzarError('Credenciales inválidas', 401);
 
+    if (usuario.activo === false || usuario.activo === 'f') {
+        lanzarError('Esta cuenta ha sido eliminada. Registra una nueva si deseas ingresar.', 403);
+    }
+    
     const passwordValida = await bcrypt.compare(password, usuario.password_hash);
     if (!passwordValida) lanzarError('Credenciales inválidas', 401);
 
