@@ -5,7 +5,8 @@ const {
     iniciarSesion, 
     obtenerPerfil, 
     actualizarPerfil, 
-    verificarToken
+    verificarToken,
+    eliminarCuenta
 } = require('../controllers/authController');
 const authMiddleware = require('../middlewares/auth');
 
@@ -23,5 +24,7 @@ router.get('/perfil', authMiddleware, obtenerPerfil);
 
 // Ruta: PUT /api/auth/perfil
 router.put('/perfil', authMiddleware, actualizarPerfil);
+
+router.delete('/perfil', authMiddleware, eliminarCuenta);
 
 module.exports = router;
