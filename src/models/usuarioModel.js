@@ -1,7 +1,7 @@
 const pool = require('../config/database');
 
 const buscarPorEmail = async (email) => {
-    const query = 'SELECT id, rol_id, password_hash, nombre_completo FROM usuarios WHERE email = $1';
+    const query = 'SELECT id, rol_id, password_hash, nombre_completo, activo FROM usuarios WHERE email = $1';
     const result = await pool.query(query, [email]);
     return result.rows[0] || null;
 };
@@ -79,4 +79,16 @@ const obtenerTokensVoluntariosCercanos = async (lat, lng) => {
     return rows.map(r => r.fcm_token);
 };
 
-module.exports = { buscarPorEmail, crearUsuario, obtenerPerfilPorId, actualizarPerfil, actualizarPreferencias, actualizarUltimaUbicacion, obtenerTokensVoluntariosCercanos };
+const desactivarUsuario = async (usuarioId) => {
+    const query = `
+        UPDATE usuarios 
+        SET activo = false, 
+            fcm_token = NULL 
+        WHERE id = $1 
+        RETURNING id;
+    `;
+    const { rows } = await pool.query(query, [usuarioId]);
+    return rows[0] || null;
+};
+
+module.exports = { buscarPorEmail, crearUsuario, obtenerPerfilPorId, actualizarPerfil, actualizarPreferencias, actualizarUltimaUbicacion, obtenerTokensVoluntariosCercanos, desactivarUsuario };
