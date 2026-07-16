@@ -14,7 +14,6 @@ const registrarUsuario = async (req, res) => {
 const iniciarSesion = async (req, res) => {
     try {
         const resultado = await authService.iniciarSesion(req.body.email, req.body.password);
-
         return res.status(200).json({ mensaje: 'Inicio de sesión exitoso', ...resultado });
     } catch (error) {
         const status = error.statusCode || 500;
@@ -22,23 +21,6 @@ const iniciarSesion = async (req, res) => {
     }
 };
 
-/*
-
-const verificarToken = async (req, res) => {
-    try {
-        return res.status(200).json({ mensaje: 'Token válido', usuario: req.usuario });
-    } catch (error) {
-        // ✅ SOLUCIÓN: Imprimimos el error en consola para depurar y usamos sus datos
-        console.error('Error en verificarToken:', error);
-        
-        return res.status(500).json({ 
-            error: 'Error al verificar la sesión',
-            detalle: error.message // O simplemente manejarlo mandando el error real
-        });
-    }
-};
-
-*/
 const verificarToken = async (req, res) => {
     try {
         return res.status(200).json({ mensaje: 'Token válido', usuario: req.usuario });
@@ -47,7 +29,6 @@ const verificarToken = async (req, res) => {
         return res.status(500).json({ error: 'Error al verificar la sesión', detalle: error.message});
     }
 };
-
 
 const obtenerPerfil = async (req, res) => {
     try {
@@ -81,11 +62,10 @@ const actualizarPerfil = async (req, res) => {
 
 const eliminarCuenta = async (req, res) => {
     try {
-        // Obtenemos el ID desde el objeto 'req.usuario' inyectado por tu 'authMiddleware'
+        // Obtenemos el ID desde el objeto '
         const usuarioId = req.usuario.id;
 
-        // Desactivar el usuario en la base de datos poniendo 'activo = false'
-        // Puedes mandar a llamar una función dedicada en tu modelo:
+        // Desactivar el usuario en la base de datos 
         await usuarioModel.desactivarUsuario(usuarioId);
 
         return res.status(200).json({ 
