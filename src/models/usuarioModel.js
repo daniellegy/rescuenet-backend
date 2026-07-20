@@ -18,8 +18,7 @@ const crearUsuario = async (rol_id, nombre_completo, telefono, email, passwordHa
 };
 
 const obtenerPerfilPorId = async (id) => {
-    // MODIFICADO: Ahora se incluye fcm_token para conocer el estado actual en la UI de Flutter
-    const query = 'SELECT id, rol_id AS role, nombre_completo, telefono, email, curp, radio_notificaciones, fcm_token FROM usuarios WHERE id = $1';
+    const query = 'SELECT id, rol_id AS role, nombre_completo, telefono, email, curp, radio_notificaciones, fcm_token, foto_perfil FROM usuarios WHERE id = $1';
     const result = await pool.query(query, [id]);
     return result.rows[0] || null;
 };
@@ -34,7 +33,7 @@ const actualizarPerfil = async (client, id, telefono, email, role, curp) => {
             curp = COALESCE($4, curp),
             actualizado_el = CURRENT_TIMESTAMP
         WHERE id = $5
-        RETURNING id, rol_id AS role, nombre_completo, telefono, email, curp;
+        RETURNING id, rol_id AS role, nombre_completo, telefono, email, curp, foto_perfil;
     `;
     const values = [telefono || null, email || null, role || null, curp || null, id];
     const db = client || pool;
@@ -42,7 +41,6 @@ const actualizarPerfil = async (client, id, telefono, email, role, curp) => {
     return result.rows[0] || null;
 };
 
-// MODIFICADO: Permite limpiar el fcm_token enviando explícitamente 'CLEAR' desde la app
 const actualizarPreferencias = async (id, radio, fcm_token) => {
     const query = `
         UPDATE usuarios 
@@ -91,4 +89,44 @@ const desactivarUsuario = async (usuarioId) => {
     return rows[0] || null;
 };
 
-module.exports = { buscarPorEmail, crearUsuario, obtenerPerfilPorId, actualizarPerfil, actualizarPreferencias, actualizarUltimaUbicacion, obtenerTokensVoluntariosCercanos, desactivarUsuario };
+// NUEVO: Actualizar la foto de perfil en la base de datos
+const actualizarFotoPerfil = async (id, urlFoto) => {
+    const query = `
+        UPDATE usuarios 
+        SET foto_perfil = $1, actualizado_el = CURRENT_TIMESTAMP
+        WHERE id = $2
+        RETURNING foto_perfil;
+    `;
+    const { rows } = await pool.query(query, [urlFoto, id]);
+    return rows[0] || null;
+};
+
+// NUEVO: Obtener estadísticas de un usuario específico
+const obtenerEstadisticasUsuario = async (id) => {
+    const query = `
+        SELECT 
+            u.id, 
+            u.nombre_completo, 
+            u.foto_perfil, 
+            u.rol_id AS role,
+            (SELECT COUNT(*) FROM reportes WHERE usuario_reportador_id = u.id) AS reportes_creados,
+            (SELECT COUNT(*) FROM reportes WHERE usuario_rescatista_id = u.id AND estado = 'Rescatado') AS rescates_realizados
+        FROM usuarios u
+        WHERE u.id = $1;
+    `;
+    const { rows } = await pool.query(query, [id]);
+    return rows[0] || null;
+};
+
+module.exports = { 
+    buscarPorEmail, 
+    crearUsuario, 
+    obtenerPerfilPorId, 
+    actualizarPerfil, 
+    actualizarPreferencias, 
+    actualizarUltimaUbicacion, 
+    obtenerTokensVoluntariosCercanos, 
+    desactivarUsuario,
+    actualizarFotoPerfil,
+    obtenerEstadisticasUsuario
+};
