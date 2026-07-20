@@ -21,12 +21,18 @@ try {
 
 const crearNuevoReporte = async (usuario, body, file) => {
     if (!file) throw { statusCode: 400, message: 'La fotografía es obligatoria' };
-
     const { 
         latitud, longitud, especie, color_dominante, 
         sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, referencias, radio, activarCanal
     } = body;
 
+    // 1. VALIDACIÓN CONTRA REPORTES DUPLICADOS
+    const posibleDuplicado = await reporteModel.verificarReporteDuplicado(especie, latitud, longitud);
+    if (posibleDuplicado) {
+        throw { statusCode: 409, message: 'Parece que alguien ya reportó a este animal cerca de aquí.' };
+    }
+
+    // 2. CREACIÓN DEL REPORTE
     const datosReporte = {
         usuario_id: usuario.id,
         latitud, longitud, especie, color_dominante,
@@ -37,7 +43,6 @@ const crearNuevoReporte = async (usuario, body, file) => {
         referencias: referencias || null,
         radio: parseInt(radio, 10) || 500,
         activar_canal: activarCanal === true || activarCanal === 'true'
-
     };
 
     const resultado = await reporteModel.crearReporteConFoto(datosReporte);
@@ -47,7 +52,7 @@ const crearNuevoReporte = async (usuario, body, file) => {
             const reporteString = JSON.stringify({
                 id: resultado.reporte_id,
                 especie, color_dominante, sexo: sexo || 'Desconocido', 
-                edad_aprox: edad_aprox || 'Cachorro', tamano: tamano || 'Pequeño',
+                edad_aprox: edad_aprox || 'Cachorro', tamano: tamano || 'Pequeño', 
                 agresividad: agresividad || 1, raza_aprox: raza_aprox || 'Desconocida',
                 caracteristicas_especiales: caracteristicas_especiales || 'Ninguna',
                 notas_adicionales: notas_adicionales || '',
@@ -79,22 +84,6 @@ const crearNuevoReporte = async (usuario, body, file) => {
                         priority: 'high' 
                     }
                 });
-                /*const mensajePayload = {
-                    notification: {
-                        title: `${emoji} Emergencia de Rescate (${urgencia.toUpperCase()})`,
-                        body: `Se reportó un ${especie} (${color_dominante}) que necesita ayuda cerca de ti.`
-                    },
-                    android: { priority: 'high' },
-                    data: { reporte: reporteString }
-                };
-                
-                await getMessaging().sendEachForMulticast({
-                    tokens: tokens,
-                    notification: mensajePayload.notification,
-                    data: mensajePayload.data,
-                    android: mensajePayload.android
-                });*/
-
             }
         }
     } catch (pushError) {
@@ -132,7 +121,6 @@ const abortarRescateAsignado = async (reporte_id, voluntario_id) => {
 };
 
 const actualizarProgreso = async (reporte_id, voluntario_id, datos) => {
-    // CORRECCIÓN: Parseo explícito para evitar crashes de 'pg' por variables undefined
     const animal_avistado = datos.animal_avistado !== undefined ? datos.animal_avistado : null;
     const lugar_traslado = datos.lugar_traslado !== undefined ? datos.lugar_traslado : null;
     
@@ -146,4 +134,13 @@ const finalizarRescateAsignado = async (reporte_id, voluntario_id, detalles, fil
     return resultado;
 };
 
-module.exports = { crearNuevoReporte, obtenerMisReportes, obtenerActivos, aceptarRescate, obtenerRescateAsignado, abortarRescateAsignado, actualizarProgreso, finalizarRescateAsignado };
+module.exports = { 
+    crearNuevoReporte, 
+    obtenerMisReportes, 
+    obtenerActivos, 
+    aceptarRescate, 
+    obtenerRescateAsignado, 
+    abortarRescateAsignado, 
+    actualizarProgreso, 
+    finalizarRescateAsignado 
+};

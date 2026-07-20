@@ -2,12 +2,13 @@ const pool = require('../config/database');
 
 const crearReporteConFoto = async (datos) => {
     const { usuario_id, latitud, longitud, especie, color_dominante, sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, url_archivo, referencias, radio, activar_canal } = datos;
+
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+
         const insertReporteQuery = `INSERT INTO reportes (usuario_reportador_id, ubicacion, especie, color_dominante, sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, estado, referencias, radio, canal_comunicacion_habilitado ) VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Nuevo', $14, $15, $16) RETURNING id;`;
         
-        // CORRECCIÓN: Colocamos activar_canal dentro del arreglo para asignarlo correctamente a $16
         const resReporte = await client.query(insertReporteQuery, [
             usuario_id, 
             parseFloat(longitud), 
@@ -28,8 +29,11 @@ const crearReporteConFoto = async (datos) => {
         ]);
         
         const reporte_id = resReporte.rows[0].id;
+
         await client.query(`INSERT INTO reporte_multimedia (reporte_id, tipo, url_archivo) VALUES ($1, 'Foto_Animal', $2);`, [reporte_id, url_archivo]);
+
         await client.query('COMMIT');
+
         return { reporte_id, ubicacion: { latitud: parseFloat(latitud), longitud: parseFloat(longitud) }, urgencia: urgencia || 'media', foto_url: url_archivo, referencias, radio };
     } catch (error) {
         await client.query('ROLLBACK');
@@ -37,6 +41,25 @@ const crearReporteConFoto = async (datos) => {
     } finally {
         client.release();
     }
+};
+
+// NUEVA FUNCIÓN: Verifica cercanía espacial (100m) y temporal (24h) de la misma especie
+const verificarReporteDuplicado = async (especie, latitud, longitud) => {
+    const query = `
+        SELECT id, urgencia, estado
+        FROM reportes 
+        WHERE especie = $1 
+        AND estado IN ('Nuevo', 'En_Proceso')
+        AND creado_el >= NOW() - INTERVAL '24 hours'
+        AND ST_DWithin(
+            ubicacion::geography, 
+            ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, 
+            100
+        )
+        LIMIT 1;
+    `;
+    const { rows } = await pool.query(query, [especie, parseFloat(longitud), parseFloat(latitud)]);
+    return rows[0] || null;
 };
 
 const _baseSelectQuery = `
@@ -125,6 +148,7 @@ const actualizarProgresoRescate = async (reporte_id, voluntario_id, animal_avist
 const finalizarEstadoRescate = async (reporte_id, voluntario_id, detalles, evidencia_url) => {
     const { costo, destino, condicion, conclusion } = detalles;
     const client = await pool.connect();
+    
     try {
         await client.query('BEGIN');
         
@@ -136,11 +160,13 @@ const finalizarEstadoRescate = async (reporte_id, voluntario_id, detalles, evide
             WHERE id = $1 AND usuario_rescatista_id = $2 AND estado = 'En_Proceso' RETURNING id;
         `;
         const { rows } = await client.query(updateQuery, [reporte_id, voluntario_id, costo || 0, destino, condicion, conclusion]);
+        
         if (rows.length === 0) throw { statusCode: 404, message: 'Rescate no encontrado o sin permisos' };
 
         if (evidencia_url) {
             await client.query(`INSERT INTO reporte_multimedia (reporte_id, tipo, url_archivo) VALUES ($1, 'Evidencia_Rescate', $2);`, [reporte_id, evidencia_url]);
         }
+
         await client.query('COMMIT');
         return rows[0];
     } catch (error) {
@@ -151,4 +177,15 @@ const finalizarEstadoRescate = async (reporte_id, voluntario_id, detalles, evide
     }
 };
 
-module.exports = { crearReporteConFoto, obtenerHistorial, obtenerReportesActivos, verificarRescateActivo, obtenerMiRescateActivo, actualizarEstadoReporte, abortarRescate, actualizarProgresoRescate, finalizarEstadoRescate };
+module.exports = { 
+    crearReporteConFoto, 
+    verificarReporteDuplicado,
+    obtenerHistorial, 
+    obtenerReportesActivos, 
+    verificarRescateActivo, 
+    obtenerMiRescateActivo, 
+    actualizarEstadoReporte, 
+    abortarRescate, 
+    actualizarProgresoRescate, 
+    finalizarEstadoRescate 
+};
