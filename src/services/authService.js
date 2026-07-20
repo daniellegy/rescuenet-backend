@@ -12,8 +12,6 @@ const lanzarError = (mensaje, statusCode) => {
 const registrarUsuario = async (datos) => {
     const { nombre_completo, telefono, email, password, rol_id, curp } = datos;
 
-    // Las validaciones de formato (Regex) y campos obligatorios ya fueron procesadas por express-validator en las rutas
-
     const usuarioExistente = await usuarioModel.buscarPorEmail(email);
     if (usuarioExistente) lanzarError('El correo ya está registrado', 409);
 
@@ -24,7 +22,6 @@ const registrarUsuario = async (datos) => {
     try {
         nuevoUsuario = await usuarioModel.crearUsuario(rol_id, nombre_completo, telefono, email, passwordHash, curp);
     } catch (error) {
-        // Captura explícita de duplicidad de CURP lanzada por PostgreSQL
         if (error.code === '23505' && error.constraint === 'usuarios_curp_key') {
             lanzarError('El CURP ingresado ya está registrado en otra cuenta de voluntario.', 409);
         }
@@ -36,11 +33,9 @@ const registrarUsuario = async (datos) => {
 };
 
 const iniciarSesion = async (email, password) => {
-    // Las validaciones de presencia ya fueron procesadas por express-validator en las rutas
-
     const usuario = await usuarioModel.buscarPorEmail(email);
     if (!usuario) lanzarError('Credenciales inválidas', 401);
-
+    
     if (usuario.activo === false || usuario.activo === 'f') {
         lanzarError('Esta cuenta ha sido eliminada. Registra una nueva si deseas ingresar.', 403);
     }
@@ -63,8 +58,6 @@ const obtenerPerfil = async (usuario_id) => {
 
 const actualizarPerfil = async (usuario_id, datos) => {
     const { telefono, email, role, curp } = datos;
-
-    // Las validaciones de formato (Regex) ya fueron procesadas por express-validator en las rutas
 
     const client = await pool.connect();
     try {
@@ -90,4 +83,22 @@ const actualizarPerfil = async (usuario_id, datos) => {
     }
 };
 
-module.exports = { registrarUsuario, iniciarSesion, obtenerPerfil, actualizarPerfil };
+// NUEVO: Guardar foto de perfil
+const actualizarFotoPerfil = async (usuario_id, file) => {
+    if (!file) lanzarError('No se recibió ninguna imagen', 400);
+    const urlFoto = file.path; // Obtenido de Cloudinary
+    
+    const resultado = await usuarioModel.actualizarFotoPerfil(usuario_id, urlFoto);
+    if (!resultado) lanzarError('No se pudo actualizar la foto de perfil', 500);
+    
+    return resultado.foto_perfil;
+};
+
+// NUEVO: Obtener estadísticas de usuario
+const obtenerEstadisticasUsuario = async (usuario_id) => {
+    const estadisticas = await usuarioModel.obtenerEstadisticasUsuario(usuario_id);
+    if (!estadisticas) lanzarError('Usuario no encontrado', 404);
+    return estadisticas;
+};
+
+module.exports = { registrarUsuario, iniciarSesion, obtenerPerfil, actualizarPerfil, actualizarFotoPerfil, obtenerEstadisticasUsuario };
