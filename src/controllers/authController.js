@@ -1,5 +1,6 @@
 const authService = require('../services/authService');
 const usuarioModel = require('../models/usuarioModel');
+const cloudinary = require('../config/cloudinary');
 
 const registrarUsuario = async (req, res) => {
     try {
@@ -48,7 +49,6 @@ const actualizarPerfil = async (req, res) => {
         if (radio_notificaciones !== undefined || fcm_token !== undefined) {
              const extras = await usuarioModel.actualizarPreferencias(req.usuario.id, radio_notificaciones, fcm_token);
              perfil.radio_notificaciones = extras.radio_notificaciones || perfil.radio_notificaciones;
-             // MODIFICADO: Mapea de vuelta el fcm_token actualizado (o eliminado) para sincronizar el estado de la app
              perfil.fcm_token = extras.fcm_token !== undefined ? extras.fcm_token : perfil.fcm_token;
         }
 
@@ -59,15 +59,10 @@ const actualizarPerfil = async (req, res) => {
     }
 };
 
-
 const eliminarCuenta = async (req, res) => {
     try {
-        // Obtenemos el ID desde el objeto '
         const usuarioId = req.usuario.id;
-
-        // Desactivar el usuario en la base de datos 
         await usuarioModel.desactivarUsuario(usuarioId);
-
         return res.status(200).json({ 
             mensaje: 'Cuenta dada de baja exitosamente en los servidores.' 
         });
@@ -79,4 +74,38 @@ const eliminarCuenta = async (req, res) => {
     }
 };
 
-module.exports = { registrarUsuario, iniciarSesion, verificarToken, obtenerPerfil, actualizarPerfil, eliminarCuenta };
+// NUEVO: Controlador para subir foto de perfil
+const actualizarFoto = async (req, res) => {
+    try {
+        const fotoUrl = await authService.actualizarFotoPerfil(req.usuario.id, req.file);
+        return res.status(200).json({ mensaje: 'Foto de perfil actualizada', foto_perfil: fotoUrl });
+    } catch (error) {
+        if (req.file && req.file.filename) {
+            try { await cloudinary.uploader.destroy(req.file.filename); } catch (e) {}
+        }
+        const status = error.statusCode || 500;
+        return res.status(status).json({ error: error.message || 'Error al actualizar la foto' });
+    }
+};
+
+// NUEVO: Controlador para las estadísticas públicas
+const obtenerEstadisticas = async (req, res) => {
+    try {
+        const estadisticas = await authService.obtenerEstadisticasUsuario(req.params.id);
+        return res.status(200).json(estadisticas);
+    } catch (error) {
+        const status = error.statusCode || 500;
+        return res.status(status).json({ error: error.message || 'Error al obtener las estadísticas' });
+    }
+};
+
+module.exports = { 
+    registrarUsuario, 
+    iniciarSesion, 
+    verificarToken, 
+    obtenerPerfil, 
+    actualizarPerfil, 
+    eliminarCuenta,
+    actualizarFoto,
+    obtenerEstadisticas
+};

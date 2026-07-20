@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
+const upload = require('../middlewares/upload'); // Añadimos el middleware de upload
 
 const { 
     registrarUsuario, 
@@ -8,11 +9,12 @@ const {
     obtenerPerfil, 
     actualizarPerfil, 
     verificarToken,
-    eliminarCuenta
+    eliminarCuenta,
+    actualizarFoto,
+    obtenerEstadisticas
 } = require('../controllers/authController');
 const authMiddleware = require('../middlewares/auth');
 
-// Middleware genérico para interceptar errores de validación
 const validarCampos = (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -21,7 +23,6 @@ const validarCampos = (req, res, next) => {
     next();
 };
 
-// Reglas de validación para Registro
 const validacionRegistro = [
     body('nombre_completo').notEmpty().withMessage('El nombre completo es obligatorio').isString(),
     body('telefono').notEmpty().withMessage('El teléfono es obligatorio').matches(/^[0-9\-()+\s]{10,15}$/).withMessage('Formato de teléfono inválido'),
@@ -34,14 +35,12 @@ const validacionRegistro = [
     validarCampos
 ];
 
-// Reglas de validación para Login
 const validacionLogin = [
     body('email').isEmail().withMessage('Por favor ingresa un correo válido'),
     body('password').notEmpty().withMessage('Por favor ingresa tu contraseña'),
     validarCampos
 ];
 
-// Reglas de validación para Actualización de Perfil
 const validacionActualizarPerfil = [
     body('telefono').optional().matches(/^[0-9\-()+\s]{10,15}$/).withMessage('Formato de teléfono inválido'),
     body('email').optional().isEmail().withMessage('Formato de correo inválido'),
@@ -50,12 +49,16 @@ const validacionActualizarPerfil = [
     validarCampos
 ];
 
-// Rutas de la API aplicando los middlewares de validación
 router.post('/register', validacionRegistro, registrarUsuario);
 router.post('/login', validacionLogin, iniciarSesion);
 router.get('/verify', authMiddleware, verificarToken);
+
 router.get('/perfil', authMiddleware, obtenerPerfil);
 router.put('/perfil', authMiddleware, validacionActualizarPerfil, actualizarPerfil);
 router.delete('/perfil', authMiddleware, eliminarCuenta);
+
+// NUEVAS RUTAS
+router.put('/perfil/foto', authMiddleware, upload.single('foto'), actualizarFoto);
+router.get('/usuario/:id/estadisticas', authMiddleware, obtenerEstadisticas);
 
 module.exports = router;
