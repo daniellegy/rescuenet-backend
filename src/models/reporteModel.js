@@ -10,28 +10,14 @@ const crearReporteConFoto = async (datos) => {
         const insertReporteQuery = `INSERT INTO reportes (usuario_reportador_id, ubicacion, especie, color_dominante, sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, estado, referencias, radio, canal_comunicacion_habilitado ) VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Nuevo', $14, $15, $16) RETURNING id;`;
         
         const resReporte = await client.query(insertReporteQuery, [
-            usuario_id, 
-            parseFloat(longitud), 
-            parseFloat(latitud), 
-            especie, 
-            color_dominante, 
-            sexo || 'Desconocido', 
-            edad_aprox || 'Cachorro', 
-            tamano || null, 
-            agresividad || 1, 
-            raza_aprox || null, 
-            caracteristicas_especiales || null, 
-            notas_adicionales || null, 
-            urgencia || 'media', 
-            referencias || null, 
-            radio || 500,
-            activar_canal === true
+            usuario_id, parseFloat(longitud), parseFloat(latitud), especie, color_dominante, 
+            sexo || 'Desconocido', edad_aprox || 'Cachorro', tamano || null, agresividad || 1, 
+            raza_aprox || null, caracteristicas_especiales || null, notas_adicionales || null, 
+            urgencia || 'media', referencias || null, radio || 500, activar_canal === true
         ]);
         
         const reporte_id = resReporte.rows[0].id;
-
         await client.query(`INSERT INTO reporte_multimedia (reporte_id, tipo, url_archivo) VALUES ($1, 'Foto_Animal', $2);`, [reporte_id, url_archivo]);
-
         await client.query('COMMIT');
 
         return { reporte_id, ubicacion: { latitud: parseFloat(latitud), longitud: parseFloat(longitud) }, urgencia: urgencia || 'media', foto_url: url_archivo, referencias, radio };
@@ -43,7 +29,6 @@ const crearReporteConFoto = async (datos) => {
     }
 };
 
-// NUEVA FUNCIÓN: Verifica cercanía espacial (100m) y temporal (24h) de la misma especie
 const verificarReporteDuplicado = async (especie, latitud, longitud) => {
     const query = `
         SELECT id, urgencia, estado
@@ -62,6 +47,7 @@ const verificarReporteDuplicado = async (especie, latitud, longitud) => {
     return rows[0] || null;
 };
 
+// SE ACTUALIZÓ ESTA CONSULTA PARA INCLUIR LAS FOTOS DE LOS USUARIOS
 const _baseSelectQuery = `
     SELECT 
         r.id, r.especie, r.color_dominante, r.sexo, r.edad_aprox, r.agresividad, r.tamano, r.raza_aprox, r.caracteristicas_especiales, r.notas_adicionales, r.urgencia, r.estado, r.usuario_rescatista_id, r.usuario_reportador_id,
@@ -69,7 +55,9 @@ const _baseSelectQuery = `
         r.canal_comunicacion_habilitado, r.canal_comunicacion_estado,
         ST_Y(r.ubicacion::geometry) AS latitud, ST_X(r.ubicacion::geometry) AS longitud,
         m1.url_archivo AS foto_url, m2.url_archivo AS foto_evidencia_url,
-        r.creado_el AS fecha_creacion, u_rep.nombre_completo AS nombre_reportador, u_resc.nombre_completo AS nombre_rescatista
+        r.creado_el AS fecha_creacion, 
+        u_rep.nombre_completo AS nombre_reportador, u_rep.foto_perfil AS foto_reportador, 
+        u_resc.nombre_completo AS nombre_rescatista, u_resc.foto_perfil AS foto_rescatista
     FROM reportes r
     LEFT JOIN reporte_multimedia m1 ON r.id = m1.reporte_id AND m1.tipo = 'Foto_Animal'
     LEFT JOIN reporte_multimedia m2 ON r.id = m2.reporte_id AND m2.tipo = 'Evidencia_Rescate'
@@ -90,7 +78,6 @@ const obtenerReportesActivos = async (limit = 50, offset = 0, usuario_id = null,
     if (lat && lng && usuario_id) {
         const userRes = await pool.query('SELECT radio_notificaciones FROM usuarios WHERE id = $1', [usuario_id]);
         const radioKm = (userRes.rows[0] && userRes.rows[0].radio_notificaciones) ? userRes.rows[0].radio_notificaciones : 30;
-        
         locationFilter = `AND ST_DWithin(r.ubicacion::geography, ST_SetSRID(ST_MakePoint($${paramIndex}, $${paramIndex+1}), 4326)::geography, $${paramIndex+2})`;
         queryParams.push(parseFloat(lng), parseFloat(lat), radioKm * 1000); 
     }
@@ -101,7 +88,6 @@ const obtenerReportesActivos = async (limit = 50, offset = 0, usuario_id = null,
         ${locationFilter}
         ORDER BY r.id DESC LIMIT $1 OFFSET $2;
     `;
-    
     const { rows } = await pool.query(query, queryParams);
     return rows;
 };
@@ -151,22 +137,18 @@ const finalizarEstadoRescate = async (reporte_id, voluntario_id, detalles, evide
     
     try {
         await client.query('BEGIN');
-        
         const updateQuery = `
             UPDATE reportes 
             SET estado = 'Rescatado', costo_rescate = $3, destino_final = $4, condicion_rescate = $5,
-                conclusion = $6,
-                actualizado_el = CURRENT_TIMESTAMP
+                conclusion = $6, actualizado_el = CURRENT_TIMESTAMP
             WHERE id = $1 AND usuario_rescatista_id = $2 AND estado = 'En_Proceso' RETURNING id;
         `;
         const { rows } = await client.query(updateQuery, [reporte_id, voluntario_id, costo || 0, destino, condicion, conclusion]);
-        
         if (rows.length === 0) throw { statusCode: 404, message: 'Rescate no encontrado o sin permisos' };
 
         if (evidencia_url) {
             await client.query(`INSERT INTO reporte_multimedia (reporte_id, tipo, url_archivo) VALUES ($1, 'Evidencia_Rescate', $2);`, [reporte_id, evidencia_url]);
         }
-
         await client.query('COMMIT');
         return rows[0];
     } catch (error) {
