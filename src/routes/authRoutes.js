@@ -1,7 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
-const upload = require('../middlewares/upload'); // Añadimos el middleware de upload
+const upload = require('../middlewares/upload');
+const rateLimit = require('express-rate-limit');
+
+// Límite de seguridad para evitar ataques de fuerza bruta
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 10, // Limita a 10 intentos fallidos por IP
+    message: { error: 'Demasiados intentos desde esta IP, por favor intenta de nuevo en 15 minutos.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
 
 const { 
     registrarUsuario, 
@@ -48,6 +58,9 @@ const validacionActualizarPerfil = [
     body('curp').optional().matches(/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z\d]\d$/).withMessage('El formato del CURP proporcionado es inválido.'),
     validarCampos
 ];
+
+router.post('/register', authLimiter, validacionRegistro, registrarUsuario);
+router.post('/login', authLimiter, validacionLogin, iniciarSesion);
 
 router.post('/register', validacionRegistro, registrarUsuario);
 router.post('/login', validacionLogin, iniciarSesion);
