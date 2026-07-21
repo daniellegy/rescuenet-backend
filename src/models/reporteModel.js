@@ -75,19 +75,36 @@ const obtenerReportesActivos = async (limit = 50, offset = 0, usuario_id = null,
     let queryParams = [limit, offset];
     let paramIndex = 3;
 
-    if (lat && lng && usuario_id) {
-        const userRes = await pool.query('SELECT radio_notificaciones FROM usuarios WHERE id = $1', [usuario_id]);
-        const radioKm = (userRes.rows[0] && userRes.rows[0].radio_notificaciones) ? userRes.rows[0].radio_notificaciones : 30;
-        locationFilter = `AND ST_DWithin(r.ubicacion::geography, ST_SetSRID(ST_MakePoint($${paramIndex}, $${paramIndex+1}), 4326)::geography, $${paramIndex+2})`;
-        queryParams.push(parseFloat(lng), parseFloat(lat), radioKm * 1000); 
+    if (usuario_id) {
+        // 1. Obtenemos el radio y la última ubicación conocida como respaldo seguro (Fallback)
+        const userRes = await pool.query(
+            'SELECT radio_notificaciones, ST_Y(ultima_ubicacion::geometry) AS u_lat, ST_X(ultima_ubicacion::geometry) AS u_lng FROM usuarios WHERE id = $1',
+            [usuario_id]
+        );
+        
+        if (userRes.rows.length > 0) {
+            const userData = userRes.rows[0];
+            
+            // 2. Priorizamos lat/lng del frontend. Si fallan (null), usamos la base de datos
+            const targetLat = lat || userData.u_lat;
+            const targetLng = lng || userData.u_lng;
+            const radioKm = userData.radio_notificaciones || 30;
+
+            // 3. Solo aplicamos el filtro si logramos obtener coordenadas de alguna de las dos fuentes
+            if (targetLat && targetLng) {
+                locationFilter = `AND ST_DWithin(r.ubicacion::geography, ST_SetSRID(ST_MakePoint($${paramIndex}, $${paramIndex+1}), 4326)::geography, $${paramIndex+2})`;
+                queryParams.push(parseFloat(targetLng), parseFloat(targetLat), radioKm * 1000);
+            }
+        }
     }
 
     const query = `
-        ${_baseSelectQuery} 
-        WHERE r.estado IN ('Nuevo', 'En_Proceso') 
+        ${_baseSelectQuery}
+        WHERE r.estado IN ('Nuevo', 'En_Proceso')
         ${locationFilter}
         ORDER BY r.id DESC LIMIT $1 OFFSET $2;
     `;
+    
     const { rows } = await pool.query(query, queryParams);
     return rows;
 };
