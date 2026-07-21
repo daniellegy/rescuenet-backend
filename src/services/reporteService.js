@@ -26,10 +26,10 @@ const crearNuevoReporte = async (usuario, body, file) => {
         sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, referencias, radio, activarCanal
     } = body;
 
-    // 1. VALIDACIÓN CONTRA REPORTES DUPLICADOS
-    const posibleDuplicado = await reporteModel.verificarReporteDuplicado(especie, latitud, longitud);
+// 1. VALIDACIÓN CONTRA REPORTES DUPLICADOS
+    const posibleDuplicado = await reporteModel.verificarReporteDuplicado(especie, color_dominante, latitud, longitud);
     if (posibleDuplicado) {
-        throw { statusCode: 409, message: 'Parece que alguien ya reportó a este animal cerca de aquí.' };
+        throw { statusCode: 409, message: 'Parece que alguien ya reportó a este animal (misma especie y color) cerca de aquí.' };
     }
 
     // 2. CREACIÓN DEL REPORTE
