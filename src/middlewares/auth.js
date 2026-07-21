@@ -1,24 +1,38 @@
 const jwt = require('jsonwebtoken');
+const pool = require('../config/database');
 require('dotenv').config();
 
-module.exports = function(req, res, next) {
-    // 1. Extraer el token de los headers
+module.exports = async function(req, res, next) {
     const authHeader = req.header('Authorization');
     
     if (!authHeader) {
         return res.status(401).json({ error: 'No hay token, permiso denegado' });
     }
-
+    
     const token = authHeader.replace('Bearer ', '');
-
+    
     try {
-        // 2. Verificar la firma del token
+        // 1. Verificar la firma y expiración del token
         const cifrado = jwt.verify(token, process.env.JWT_SECRET);
         
-        // 3. Inyectar los datos del usuario en la petición para usarlos en el controlador
+        // 2. VALIDACIÓN DE SEGURIDAD: Verificar estado en la base de datos
+        // Extraemos el id del usuario contenido en el payload
+        const query = 'SELECT activo FROM usuarios WHERE id = $1';
+        const { rows } = await pool.query(query, [cifrado.usuario.id]);
+        
+        // Si el usuario no existe o fue dado de baja (activo === false)
+        if (rows.length === 0 || rows[0].activo === false || rows[0].activo === 'f') {
+            return res.status(403).json({ error: 'Acceso denegado. La cuenta ha sido desactivada o eliminada.' });
+        }
+        
+        // 3. Inyectar los datos del usuario en la petición
         req.usuario = cifrado.usuario;
-        next(); // Permitir que la petición continúe
+        next();
     } catch (error) {
-        res.status(401).json({ error: 'Token inválido o expirado' });
+        // Diferenciar entre token expirado o manipulado
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ error: 'Tu sesión ha expirado. Por favor, inicia sesión de nuevo.' });
+        }
+        res.status(401).json({ error: 'Token inválido o corrupto.' });
     }
 };
