@@ -29,21 +29,22 @@ const crearReporteConFoto = async (datos) => {
     }
 };
 
-const verificarReporteDuplicado = async (especie, latitud, longitud) => {
+const verificarReporteDuplicado = async (especie, color_dominante, latitud, longitud) => {
     const query = `
         SELECT id, urgencia, estado
         FROM reportes 
         WHERE especie = $1 
+        AND color_dominante = $2
         AND estado IN ('Nuevo', 'En_Proceso')
         AND creado_el >= NOW() - INTERVAL '24 hours'
         AND ST_DWithin(
             ubicacion::geography, 
-            ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, 
-            100
+            ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, 
+            150
         )
         LIMIT 1;
     `;
-    const { rows } = await pool.query(query, [especie, parseFloat(longitud), parseFloat(latitud)]);
+    const { rows } = await pool.query(query, [especie, color_dominante, parseFloat(longitud), parseFloat(latitud)]);
     return rows[0] || null;
 };
 
