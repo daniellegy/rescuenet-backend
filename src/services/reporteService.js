@@ -1,6 +1,7 @@
 const reporteModel = require('../models/reporteModel');
-const usuarioModel = require('../models/usuarioModel'); 
+const usuarioModel = require('../models/usuarioModel');
 const canalModel = require('../models/canalModel');
+const pool = require('../config/database');
 const path = require('path');
 const { initializeApp, cert, getApps } = require('firebase-admin/app');
 const { getMessaging } = require('firebase-admin/messaging');
@@ -26,13 +27,11 @@ const crearNuevoReporte = async (usuario, body, file) => {
         sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, referencias, radio, activarCanal
     } = body;
 
-// 1. VALIDACIÓN CONTRA REPORTES DUPLICADOS
     const posibleDuplicado = await reporteModel.verificarReporteDuplicado(especie, color_dominante, latitud, longitud);
     if (posibleDuplicado) {
-        throw { statusCode: 409, message: 'Parece que alguien ya reportó a este animal (misma especie y color) cerca de aquí.' };
+        throw { statusCode: 409, message: 'Parece que alguien ya reportó a este animal cerca de aquí.' };
     }
 
-    // 2. CREACIÓN DEL REPORTE
     const datosReporte = {
         usuario_id: usuario.id,
         latitud, longitud, especie, color_dominante,
@@ -53,7 +52,7 @@ const crearNuevoReporte = async (usuario, body, file) => {
                 id: resultado.reporte_id,
                 especie, color_dominante, sexo: sexo || 'Desconocido', 
                 edad_aprox: edad_aprox || 'Cachorro', tamano: tamano || 'Pequeño', 
-                agresividad: agresividad || 1, raza_aprox: raza_aprox || 'Desconocida',
+                agresividad: agresividad || 0, raza_aprox: raza_aprox || 'Desconocida',
                 caracteristicas_especiales: caracteristicas_especiales || 'Ninguna',
                 notas_adicionales: notas_adicionales || '',
                 urgencia: urgencia || 'media',
@@ -68,7 +67,6 @@ const crearNuevoReporte = async (usuario, body, file) => {
             });
 
             const tokens = await usuarioModel.obtenerTokensVoluntariosCercanos(latitud, longitud);
-
             if (tokens.length > 0) {
                 const emoji = urgencia === 'alta' ? '🚨' : urgencia === 'media' ? '⚠️' : '🐾';
                 await getMessaging().sendEachForMulticast({
@@ -77,19 +75,14 @@ const crearNuevoReporte = async (usuario, body, file) => {
                         title: `${emoji} Emergencia de Rescate (${urgencia.toUpperCase()})`,
                         body: `Se reportó un ${especie} (${color_dominante}) que necesita ayuda cerca de ti.`
                     },
-                    data: { 
-                        reporte: reporteString 
-                    },
-                    android: { 
-                        priority: 'high' 
-                    }
+                    data: { reporte: reporteString },
+                    android: { priority: 'high' }
                 });
             }
         }
     } catch (pushError) {
         console.error("Fallo al enviar notificación push:", pushError);
     }
-
     return resultado;
 };
 
@@ -123,24 +116,41 @@ const abortarRescateAsignado = async (reporte_id, voluntario_id) => {
 const actualizarProgreso = async (reporte_id, voluntario_id, datos) => {
     const animal_avistado = datos.animal_avistado !== undefined ? datos.animal_avistado : null;
     const lugar_traslado = datos.lugar_traslado !== undefined ? datos.lugar_traslado : null;
-    
     return await reporteModel.actualizarProgresoRescate(reporte_id, voluntario_id, animal_avistado, lugar_traslado);
 };
 
 const finalizarRescateAsignado = async (reporte_id, voluntario_id, detalles, file) => {
     const evidencia_url = file ? file.path : null;
     const resultado = await reporteModel.finalizarEstadoRescate(reporte_id, voluntario_id, detalles, evidencia_url);
+    
+    // Novedad: Notificar al ciudadano sobre la conclusión
+    try {
+        const query = `
+            SELECT u.fcm_token FROM reportes r 
+            JOIN usuarios u ON r.usuario_reportador_id = u.id 
+            WHERE r.id = $1 AND u.fcm_token IS NOT NULL
+        `;
+        const res = await pool.query(query, [reporte_id]);
+        if (res.rows.length > 0) {
+            await getMessaging().send({
+                token: res.rows[0].fcm_token,
+                notification: {
+                    title: '¡Emergencia Resuelta!',
+                    body: 'El voluntario ha concluido tu reporte. Revisa la conclusión final.'
+                },
+                data: { reporte_id: String(reporte_id) },
+                android: { priority: 'high' }
+            });
+        }
+    } catch (e) {
+        console.error('Error al notificar resolución al reportador:', e);
+    }
+
     await canalModel.cerrarCanal(reporte_id);
     return resultado;
 };
 
 module.exports = { 
-    crearNuevoReporte, 
-    obtenerMisReportes, 
-    obtenerActivos, 
-    aceptarRescate, 
-    obtenerRescateAsignado, 
-    abortarRescateAsignado, 
-    actualizarProgreso, 
-    finalizarRescateAsignado 
+    crearNuevoReporte, obtenerMisReportes, obtenerActivos, aceptarRescate, 
+    obtenerRescateAsignado, abortarRescateAsignado, actualizarProgreso, finalizarRescateAsignado 
 };
