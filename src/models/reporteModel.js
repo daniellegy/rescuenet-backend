@@ -2,11 +2,10 @@ const pool = require('../config/database');
 
 const crearReporteConFoto = async (datos) => {
     const { usuario_id, latitud, longitud, especie, color_dominante, sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, url_archivo, referencias, radio, activar_canal } = datos;
-
     const client = await pool.connect();
+    
     try {
         await client.query('BEGIN');
-
         const insertReporteQuery = `INSERT INTO reportes (usuario_reportador_id, ubicacion, especie, color_dominante, sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, estado, referencias, radio, canal_comunicacion_habilitado ) VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Nuevo', $14, $15, $16) RETURNING id;`;
         
         const resReporte = await client.query(insertReporteQuery, [
@@ -17,9 +16,10 @@ const crearReporteConFoto = async (datos) => {
         ]);
         
         const reporte_id = resReporte.rows[0].id;
+        
         await client.query(`INSERT INTO reporte_multimedia (reporte_id, tipo, url_archivo) VALUES ($1, 'Foto_Animal', $2);`, [reporte_id, url_archivo]);
+        
         await client.query('COMMIT');
-
         return { reporte_id, ubicacion: { latitud: parseFloat(latitud), longitud: parseFloat(longitud) }, urgencia: urgencia || 'media', foto_url: url_archivo, referencias, radio };
     } catch (error) {
         await client.query('ROLLBACK');
@@ -48,7 +48,6 @@ const verificarReporteDuplicado = async (especie, color_dominante, latitud, long
     return rows[0] || null;
 };
 
-// SE ACTUALIZÓ ESTA CONSULTA PARA INCLUIR LAS FOTOS DE LOS USUARIOS
 const _baseSelectQuery = `
     SELECT 
         r.id, r.especie, r.color_dominante, r.sexo, r.edad_aprox, r.agresividad, r.tamano, r.raza_aprox, r.caracteristicas_especiales, r.notas_adicionales, r.urgencia, r.estado, r.usuario_rescatista_id, r.usuario_reportador_id,
@@ -73,11 +72,12 @@ const obtenerHistorial = async (usuario_id) => {
 
 const obtenerReportesActivos = async (limit = 50, offset = 0, usuario_id = null, lat = null, lng = null) => {
     let locationFilter = '';
+    // Respaldo de ordenamiento si no hay coordenadas disponibles
+    let orderClause = 'ORDER BY r.id DESC';
     let queryParams = [limit, offset];
     let paramIndex = 3;
 
     if (usuario_id) {
-        // 1. Obtenemos el radio y la última ubicación conocida como respaldo seguro (Fallback)
         const userRes = await pool.query(
             'SELECT radio_notificaciones, ST_Y(ultima_ubicacion::geometry) AS u_lat, ST_X(ultima_ubicacion::geometry) AS u_lng FROM usuarios WHERE id = $1',
             [usuario_id]
@@ -85,15 +85,16 @@ const obtenerReportesActivos = async (limit = 50, offset = 0, usuario_id = null,
         
         if (userRes.rows.length > 0) {
             const userData = userRes.rows[0];
-            
-            // 2. Priorizamos lat/lng del frontend. Si fallan (null), usamos la base de datos
             const targetLat = lat || userData.u_lat;
             const targetLng = lng || userData.u_lng;
             const radioKm = userData.radio_notificaciones || 30;
 
-            // 3. Solo aplicamos el filtro si logramos obtener coordenadas de alguna de las dos fuentes
             if (targetLat && targetLng) {
                 locationFilter = `AND ST_DWithin(r.ubicacion::geography, ST_SetSRID(ST_MakePoint($${paramIndex}, $${paramIndex+1}), 4326)::geography, $${paramIndex+2})`;
+                
+                // MEJORA: Ordenamiento métrico estricto de menor a mayor distancia usando PostGIS
+                orderClause = `ORDER BY ST_Distance(r.ubicacion::geography, ST_SetSRID(ST_MakePoint($${paramIndex}, $${paramIndex+1}), 4326)::geography) ASC, r.id DESC`;
+                
                 queryParams.push(parseFloat(targetLng), parseFloat(targetLat), radioKm * 1000);
             }
         }
@@ -103,7 +104,8 @@ const obtenerReportesActivos = async (limit = 50, offset = 0, usuario_id = null,
         ${_baseSelectQuery}
         WHERE r.estado IN ('Nuevo', 'En_Proceso')
         ${locationFilter}
-        ORDER BY r.id DESC LIMIT $1 OFFSET $2;
+        ${orderClause} 
+        LIMIT $1 OFFSET $2;
     `;
     
     const { rows } = await pool.query(query, queryParams);
@@ -123,14 +125,18 @@ const obtenerMiRescateActivo = async (voluntario_id) => {
 const actualizarEstadoReporte = async (reporte_id, voluntario_id, estado) => {
     const query = `UPDATE reportes SET estado = $1, usuario_rescatista_id = $2, actualizado_el = CURRENT_TIMESTAMP WHERE id = $3 AND estado = 'Nuevo' RETURNING id;`;
     const { rows } = await pool.query(query, [estado, voluntario_id, reporte_id]);
-    if (rows.length === 0) throw { statusCode: 404, message: 'Reporte no encontrado o ya fue aceptado' };
+    if (rows.length === 0) {
+        throw { statusCode: 404, message: 'Reporte no encontrado o ya fue aceptado' };
+    }
     return rows[0];
 };
 
 const abortarRescate = async (reporte_id, voluntario_id) => {
     const query = `UPDATE reportes SET estado = 'Nuevo', usuario_rescatista_id = NULL, animal_avistado = NULL, lugar_traslado = NULL, actualizado_el = CURRENT_TIMESTAMP WHERE id = $1 AND usuario_rescatista_id = $2 AND estado = 'En_Proceso' RETURNING id;`;
     const { rows } = await pool.query(query, [reporte_id, voluntario_id]);
-    if (rows.length === 0) throw { statusCode: 404, message: 'Rescate no encontrado o sin permisos' };
+    if (rows.length === 0) {
+        throw { statusCode: 404, message: 'Rescate no encontrado o sin permisos' };
+    }
     return rows[0];
 };
 
@@ -145,7 +151,9 @@ const actualizarProgresoRescate = async (reporte_id, voluntario_id, animal_avist
         RETURNING id;
     `;
     const { rows } = await pool.query(query, [animal_avistado, lugar_traslado, reporte_id, voluntario_id]);
-    if (rows.length === 0) throw { statusCode: 404, message: 'Rescate no encontrado o sin permisos' };
+    if (rows.length === 0) {
+        throw { statusCode: 404, message: 'Rescate no encontrado o sin permisos' };
+    }
     return rows[0];
 };
 
@@ -162,11 +170,14 @@ const finalizarEstadoRescate = async (reporte_id, voluntario_id, detalles, evide
             WHERE id = $1 AND usuario_rescatista_id = $2 AND estado = 'En_Proceso' RETURNING id;
         `;
         const { rows } = await client.query(updateQuery, [reporte_id, voluntario_id, costo || 0, destino, condicion, conclusion]);
-        if (rows.length === 0) throw { statusCode: 404, message: 'Rescate no encontrado o sin permisos' };
-
+        if (rows.length === 0) {
+            throw { statusCode: 404, message: 'Rescate no encontrado o sin permisos' };
+        }
+        
         if (evidencia_url) {
             await client.query(`INSERT INTO reporte_multimedia (reporte_id, tipo, url_archivo) VALUES ($1, 'Evidencia_Rescate', $2);`, [reporte_id, evidencia_url]);
         }
+        
         await client.query('COMMIT');
         return rows[0];
     } catch (error) {
