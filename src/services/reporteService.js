@@ -2,18 +2,24 @@ const reporteModel = require('../models/reporteModel');
 const usuarioModel = require('../models/usuarioModel');
 const canalModel = require('../models/canalModel');
 const pool = require('../config/database');
-const path = require('path');
 const { initializeApp, cert, getApps } = require('firebase-admin/app');
 const { getMessaging } = require('firebase-admin/messaging');
+const AppError = require('../utils/AppError');
 
 try {
-    const rutaKey = path.join(process.cwd(), 'firebase-key.json');
-    const serviceAccount = require(rutaKey);
-    
     if (getApps().length === 0) {
-        initializeApp({
-            credential: cert(serviceAccount)
-        });
+        let credentialConfig;
+        if (process.env.FIREBASE_CREDENTIALS) {
+            // Práctica segura para producción: parsear desde variable de entorno
+            credentialConfig = cert(JSON.parse(process.env.FIREBASE_CREDENTIALS));
+        } else {
+            // Fallback para desarrollo local
+            const path = require('path');
+            const rutaKey = path.join(process.cwd(), 'firebase-key.json');
+            credentialConfig = cert(require(rutaKey));
+        }
+        
+        initializeApp({ credential: credentialConfig });
         console.log("Firebase inicializado con éxito.");
     }
 } catch (error) {
@@ -21,18 +27,18 @@ try {
 }
 
 const crearNuevoReporte = async (usuario, body, file) => {
-    if (!file) throw { statusCode: 400, message: 'La fotografía es obligatoria' };
-
+    if (!file) throw new AppError('La fotografía es obligatoria', 400);
+    
     const { 
-        latitud, longitud, especie, color_dominante, 
+        latitud, longitud, especie, color_dominante,
         sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, referencias, radio, activarCanal
     } = body;
-
+    
     const posibleDuplicado = await reporteModel.verificarReporteDuplicado(especie, color_dominante, latitud, longitud);
     if (posibleDuplicado) {
-        throw { statusCode: 409, message: 'Parece que alguien ya reportó a este animal cerca de aquí.' };
+        throw new AppError('Parece que alguien ya reportó a este animal cerca de aquí.', 409);
     }
-
+    
     const datosReporte = {
         usuario_id: usuario.id,
         latitud, longitud, especie, color_dominante,
@@ -44,9 +50,9 @@ const crearNuevoReporte = async (usuario, body, file) => {
         radio: parseInt(radio, 10) || 500,
         activar_canal: activarCanal === true || activarCanal === 'true'
     };
-
+    
     const resultado = await reporteModel.crearReporteConFoto(datosReporte);
-
+    
     try {
         if (resultado.reporte_id) {
             const reporteString = JSON.stringify({
@@ -66,7 +72,7 @@ const crearNuevoReporte = async (usuario, body, file) => {
                 referencias: referencias || 'Sin referencias',
                 radio: parseInt(radio, 10) || 500
             });
-
+            
             const tokens = await usuarioModel.obtenerTokensVoluntariosCercanos(latitud, longitud);
             if (tokens.length > 0) {
                 const emoji = urgencia === 'alta' ? '🚨' : urgencia === 'media' ? '⚠️' : '🐾';
@@ -85,7 +91,7 @@ const crearNuevoReporte = async (usuario, body, file) => {
     } catch (pushError) {
         console.error("Fallo al enviar notificación push:", pushError);
     }
-
+    
     return resultado;
 };
 
@@ -100,7 +106,7 @@ const obtenerActivos = async (limit, offset, usuario_id, lat, lng) => {
 const aceptarRescate = async (reporte_id, voluntario_id) => {
     const rescateOcupadoRes = await reporteModel.verificarRescateActivo(voluntario_id);
     if (rescateOcupadoRes) {
-        throw { statusCode: 403, message: 'Ya tienes un caso en proceso. Finalízalo antes de aceptar otro.' };
+        throw new AppError('Ya tienes un caso en proceso. Finalízalo antes de aceptar otro.', 403);
     }
     await reporteModel.actualizarEstadoReporte(reporte_id, voluntario_id, 'En_Proceso');
     await canalModel.activarCanalSiCorresponde(reporte_id);
@@ -137,7 +143,7 @@ const finalizarRescateAsignado = async (reporte_id, voluntario_id, detalles, fil
             await getMessaging().send({
                 token: res.rows[0].fcm_token,
                 notification: {
-                    title: '✅ Emergencia Resuelta!',
+                    title: '✅ ¡Emergencia Resuelta!',
                     body: 'El voluntario ha concluido tu reporte. Revisa la conclusión final.'
                 },
                 data: { reporte_id: String(reporte_id) },
