@@ -72,7 +72,6 @@ const obtenerHistorial = async (usuario_id) => {
 
 const obtenerReportesActivos = async (limit = 50, offset = 0, usuario_id = null, lat = null, lng = null) => {
     let locationFilter = '';
-    // Respaldo de ordenamiento si no hay coordenadas disponibles
     let orderClause = 'ORDER BY r.id DESC';
     let queryParams = [limit, offset];
     let paramIndex = 3;
@@ -91,10 +90,7 @@ const obtenerReportesActivos = async (limit = 50, offset = 0, usuario_id = null,
 
             if (targetLat && targetLng) {
                 locationFilter = `AND ST_DWithin(r.ubicacion::geography, ST_SetSRID(ST_MakePoint($${paramIndex}, $${paramIndex+1}), 4326)::geography, $${paramIndex+2})`;
-                
-                // MEJORA: Ordenamiento métrico estricto de menor a mayor distancia usando PostGIS
                 orderClause = `ORDER BY ST_Distance(r.ubicacion::geography, ST_SetSRID(ST_MakePoint($${paramIndex}, $${paramIndex+1}), 4326)::geography) ASC, r.id DESC`;
-                
                 queryParams.push(parseFloat(targetLng), parseFloat(targetLat), radioKm * 1000);
             }
         }
@@ -103,6 +99,7 @@ const obtenerReportesActivos = async (limit = 50, offset = 0, usuario_id = null,
     const query = `
         ${_baseSelectQuery}
         WHERE r.estado IN ('Nuevo', 'En_Proceso')
+        AND r.creado_el >= NOW() - INTERVAL '3 days'
         ${locationFilter}
         ${orderClause} 
         LIMIT $1 OFFSET $2;
@@ -170,6 +167,7 @@ const finalizarEstadoRescate = async (reporte_id, voluntario_id, detalles, evide
             WHERE id = $1 AND usuario_rescatista_id = $2 AND estado = 'En_Proceso' RETURNING id;
         `;
         const { rows } = await client.query(updateQuery, [reporte_id, voluntario_id, costo || 0, destino, condicion, conclusion]);
+        
         if (rows.length === 0) {
             throw { statusCode: 404, message: 'Rescate no encontrado o sin permisos' };
         }

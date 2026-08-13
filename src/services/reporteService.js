@@ -22,6 +22,7 @@ try {
 
 const crearNuevoReporte = async (usuario, body, file) => {
     if (!file) throw { statusCode: 400, message: 'La fotografía es obligatoria' };
+
     const { 
         latitud, longitud, especie, color_dominante, 
         sexo, edad_aprox, tamano, agresividad, raza_aprox, caracteristicas_especiales, notas_adicionales, urgencia, referencias, radio, activarCanal
@@ -76,13 +77,15 @@ const crearNuevoReporte = async (usuario, body, file) => {
                         body: `Se reportó un ${especie} (${color_dominante}) que necesita ayuda cerca de ti.`
                     },
                     data: { reporte: reporteString },
-                    android: { priority: 'high' }
+                    android: { priority: 'high' },
+                    apns: { payload: { aps: { sound: 'default', contentAvailable: true } } }
                 });
             }
         }
     } catch (pushError) {
         console.error("Fallo al enviar notificación push:", pushError);
     }
+
     return resultado;
 };
 
@@ -123,7 +126,6 @@ const finalizarRescateAsignado = async (reporte_id, voluntario_id, detalles, fil
     const evidencia_url = file ? file.path : null;
     const resultado = await reporteModel.finalizarEstadoRescate(reporte_id, voluntario_id, detalles, evidencia_url);
     
-    // Novedad: Notificar al ciudadano sobre la conclusión
     try {
         const query = `
             SELECT u.fcm_token FROM reportes r 
@@ -135,17 +137,17 @@ const finalizarRescateAsignado = async (reporte_id, voluntario_id, detalles, fil
             await getMessaging().send({
                 token: res.rows[0].fcm_token,
                 notification: {
-                    title: '¡Emergencia Resuelta!',
+                    title: '✅ Emergencia Resuelta!',
                     body: 'El voluntario ha concluido tu reporte. Revisa la conclusión final.'
                 },
                 data: { reporte_id: String(reporte_id) },
-                android: { priority: 'high' }
+                android: { priority: 'high' },
+                apns: { payload: { aps: { sound: 'default', contentAvailable: true } } }
             });
         }
     } catch (e) {
         console.error('Error al notificar resolución al reportador:', e);
     }
-
     await canalModel.cerrarCanal(reporte_id);
     return resultado;
 };

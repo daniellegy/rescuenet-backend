@@ -1,3 +1,4 @@
+// services/canalService.js
 const canalModel = require('../models/canalModel');
 const pool = require('../config/database');
 const { getMessaging } = require('firebase-admin/messaging');
@@ -30,10 +31,8 @@ const enviarMensaje = async (reporte_id, usuario_id, contenido) => {
     if (!estado || estado.canal_comunicacion_estado !== 'activo') {
         throw { statusCode: 400, message: 'El canal de comunicación no está activo.' };
     }
-
     const mensaje = await canalModel.crearMensaje(reporte_id, usuario_id, contenido.trim());
 
-    // Novedad: Notificar por Push al usuario contrario (Voluntario a Reportante o viceversa)
     try {
         const query = `
             SELECT u.fcm_token FROM reportes r
@@ -51,13 +50,13 @@ const enviarMensaje = async (reporte_id, usuario_id, contenido) => {
                     body: contenido.length > 30 ? contenido.substring(0, 30) + '...' : contenido
                 },
                 data: { reporte_id: String(reporte_id), tipo: 'chat' },
-                android: { priority: 'high' }
+                android: { priority: 'high' },
+                apns: { payload: { aps: { sound: 'default', contentAvailable: true } } }
             });
         }
     } catch (err) {
         console.error("Error push en chat:", err);
     }
-
     return mensaje;
 };
 
