@@ -1,4 +1,3 @@
-// services/canalService.js
 const canalModel = require('../models/canalModel');
 const pool = require('../config/database');
 const { getMessaging } = require('firebase-admin/messaging');
