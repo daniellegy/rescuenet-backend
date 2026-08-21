@@ -8,6 +8,8 @@ const socketConfig = require('./src/config/socket'); // 2. Importamos tu nueva c
 // Importar rutas
 const authRoutes = require('./src/routes/authRoutes');
 const reporteRoutes = require('./src/routes/reporteRoutes');
+const patrocinadorRoutes = require('./src/routes/patrocinadorRoutes');
+const patrocinadoresPublicoRoutes = require('./src/routes/patrocinadoresPublicoRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,6 +20,8 @@ app.use(express.json());
 // Montar rutas
 app.use('/api/auth', authRoutes);
 app.use('/api/reportes', reporteRoutes);
+app.use('/api/patrocinador', patrocinadorRoutes);
+app.use('/api/directorio-patrocinadores', patrocinadoresPublicoRoutes);
 
 app.get('/api/health', async (req, res) => {
     try {
