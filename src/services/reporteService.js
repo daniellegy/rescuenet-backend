@@ -10,10 +10,8 @@ try {
     if (getApps().length === 0) {
         let credentialConfig;
         if (process.env.FIREBASE_CREDENTIALS) {
-            // Práctica segura para producción: parsear desde variable de entorno
             credentialConfig = cert(JSON.parse(process.env.FIREBASE_CREDENTIALS));
         } else {
-            // Fallback para desarrollo local
             const path = require('path');
             const rutaKey = path.join(process.cwd(), 'firebase-key.json');
             credentialConfig = cert(require(rutaKey));
@@ -99,6 +97,11 @@ const obtenerMisReportes = async (usuario_id) => {
     return await reporteModel.obtenerHistorial(usuario_id);
 };
 
+// NUEVO: Invoca el modelo para obtener reportes públicos de un usuario
+const obtenerReportesDeUsuarioPublico = async (usuario_id) => {
+    return await reporteModel.obtenerReportesPorUsuarioId(usuario_id);
+};
+
 const obtenerActivos = async (limit, offset, usuario_id, lat, lng) => {
     return await reporteModel.obtenerReportesActivos(limit, offset, usuario_id, lat, lng);
 };
@@ -159,6 +162,13 @@ const finalizarRescateAsignado = async (reporte_id, voluntario_id, detalles, fil
 };
 
 module.exports = { 
-    crearNuevoReporte, obtenerMisReportes, obtenerActivos, aceptarRescate, 
-    obtenerRescateAsignado, abortarRescateAsignado, actualizarProgreso, finalizarRescateAsignado 
+    crearNuevoReporte, 
+    obtenerMisReportes, 
+    obtenerActivos, 
+    aceptarRescate, 
+    obtenerRescateAsignado, 
+    abortarRescateAsignado, 
+    actualizarProgreso, 
+    finalizarRescateAsignado,
+    obtenerReportesDeUsuarioPublico // Exportar el nuevo método
 };

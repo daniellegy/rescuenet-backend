@@ -18,12 +18,12 @@ const crearUsuario = async (rol_id, nombre_completo, telefono, email, passwordHa
 };
 
 const obtenerPerfilPorId = async (id) => {
-    const query = 'SELECT id, rol_id AS role, nombre_completo, telefono, email, curp, radio_notificaciones, fcm_token, foto_perfil FROM usuarios WHERE id = $1';
+    const query = 'SELECT id, rol_id AS role, nombre_completo, telefono, email, curp, radio_notificaciones, fcm_token, foto_perfil, perfil_privado FROM usuarios WHERE id = $1';
     const result = await pool.query(query, [id]);
     return result.rows[0] || null;
 };
 
-const actualizarPerfil = async (client, id, telefono, email, role, curp) => {
+const actualizarPerfil = async (client, id, telefono, email, role, curp, perfil_privado) => {
     const updateQuery = `
         UPDATE usuarios 
         SET 
@@ -31,11 +31,15 @@ const actualizarPerfil = async (client, id, telefono, email, role, curp) => {
             email = COALESCE($2, email),
             rol_id = COALESCE($3, rol_id),
             curp = COALESCE($4, curp),
+            perfil_privado = COALESCE($5, perfil_privado),
             actualizado_el = CURRENT_TIMESTAMP
-        WHERE id = $5
-        RETURNING id, rol_id AS role, nombre_completo, telefono, email, curp, foto_perfil;
+        WHERE id = $6
+        RETURNING id, rol_id AS role, nombre_completo, telefono, email, curp, foto_perfil, perfil_privado;
     `;
-    const values = [telefono || null, email || null, role || null, curp || null, id];
+    // Verificamos si perfil_privado es undefined para que COALESCE tome el valor actual
+    const valorPrivacidad = perfil_privado !== undefined ? perfil_privado : null;
+    const values = [telefono || null, email || null, role || null, curp || null, valorPrivacidad, id];
+    
     const db = client || pool;
     const result = await db.query(updateQuery, values);
     return result.rows[0] || null;
@@ -89,7 +93,6 @@ const desactivarUsuario = async (usuarioId) => {
     return rows[0] || null;
 };
 
-// NUEVO: Actualizar la foto de perfil en la base de datos
 const actualizarFotoPerfil = async (id, urlFoto) => {
     const query = `
         UPDATE usuarios 
@@ -101,7 +104,6 @@ const actualizarFotoPerfil = async (id, urlFoto) => {
     return rows[0] || null;
 };
 
-// NUEVO: Obtener estadísticas de un usuario específico
 const obtenerEstadisticasUsuario = async (id) => {
     const query = `
         SELECT 
@@ -109,6 +111,7 @@ const obtenerEstadisticasUsuario = async (id) => {
             u.nombre_completo, 
             u.foto_perfil, 
             u.rol_id AS role,
+            u.perfil_privado,
             (SELECT COUNT(*) FROM reportes WHERE usuario_reportador_id = u.id) AS reportes_creados,
             (SELECT COUNT(*) FROM reportes WHERE usuario_rescatista_id = u.id AND estado = 'Rescatado') AS rescates_realizados
         FROM usuarios u

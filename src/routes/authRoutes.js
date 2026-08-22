@@ -23,6 +23,7 @@ const {
     actualizarFoto,
     obtenerEstadisticas
 } = require('../controllers/authController');
+
 const authMiddleware = require('../middlewares/auth');
 
 const validarCampos = (req, res, next) => {
@@ -56,21 +57,18 @@ const validacionActualizarPerfil = [
     body('email').optional().isEmail().withMessage('Formato de correo inválido'),
     body('role').optional().isIn([1, 2]).withMessage('Acción denegada. Rol inválido.'),
     body('curp').optional().matches(/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z\d]\d$/).withMessage('El formato del CURP proporcionado es inválido.'),
+    body('perfil_privado').optional().isBoolean().withMessage('El valor de privacidad debe ser booleano.'), // <-- NUEVO
     validarCampos
 ];
 
 router.post('/register', authLimiter, validacionRegistro, registrarUsuario);
 router.post('/login', authLimiter, validacionLogin, iniciarSesion);
 
-router.post('/register', validacionRegistro, registrarUsuario);
-router.post('/login', validacionLogin, iniciarSesion);
 router.get('/verify', authMiddleware, verificarToken);
-
 router.get('/perfil', authMiddleware, obtenerPerfil);
 router.put('/perfil', authMiddleware, validacionActualizarPerfil, actualizarPerfil);
 router.delete('/perfil', authMiddleware, eliminarCuenta);
 
-// NUEVAS RUTAS
 router.put('/perfil/foto', authMiddleware, upload.single('foto'), actualizarFoto);
 router.get('/usuario/:id/estadisticas', authMiddleware, obtenerEstadisticas);
 

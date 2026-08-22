@@ -24,18 +24,37 @@ const obtenerMisReportes = async (req, res) => {
     }
 };
 
+// NUEVO: Obtener los reportes de un usuario público con validación de privacidad de backend
+const obtenerReportesUsuarioPublico = async (req, res) => {
+    try {
+        const estadisticas = await usuarioModel.obtenerEstadisticasUsuario(req.params.id);
+        if (!estadisticas) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+        
+        // Bloqueo de seguridad robusta si se intentó hacer bypass desde el cliente
+        if (estadisticas.perfil_privado) {
+            return res.status(403).json({ error: 'El perfil de este usuario es privado' });
+        }
+
+        const reportes = await reporteService.obtenerReportesDeUsuarioPublico(req.params.id);
+        return res.status(200).json(reportes);
+    } catch (error) {
+        return res.status(500).json({ error: 'Error al cargar los reportes del usuario' });
+    }
+};
+
 const obtenerReportesActivos = async (req, res) => {
     try {
         const page = parseInt(req.query.page, 10) || 1;
         const limit = parseInt(req.query.limit, 10) || 50;
         const offset = (page - 1) * limit;
         const { lat, lng } = req.query;
-
-        // Actualizamos la ubicación del usuario en segundo plano para notificaciones futuras
+        
         if (lat && lng) {
             await usuarioModel.actualizarUltimaUbicacion(req.usuario.id, lat, lng);
         }
-
+        
         const activos = await reporteService.obtenerActivos(limit, offset, req.usuario.id, lat, lng);
         return res.status(200).json(activos);
     } catch (error) {
@@ -95,4 +114,14 @@ const finalizarReporte = async (req, res) => {
     }
 };
 
-module.exports = { crearReporte, obtenerMisReportes, obtenerReportesActivos, aceptarReporte, obtenerMiRescateActivo, abortarReporte, actualizarProgreso, finalizarReporte };
+module.exports = { 
+    crearReporte, 
+    obtenerMisReportes, 
+    obtenerReportesActivos, 
+    aceptarReporte, 
+    obtenerMiRescateActivo, 
+    abortarReporte, 
+    actualizarProgreso, 
+    finalizarReporte,
+    obtenerReportesUsuarioPublico // Exportamos el nuevo controlador
+};

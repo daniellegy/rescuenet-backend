@@ -52,11 +52,14 @@ const obtenerPerfil = async (usuario_id) => {
 };
 
 const actualizarPerfil = async (usuario_id, datos) => {
-    const { telefono, email, role, curp } = datos;
+    // Añadimos perfil_privado al destructuring
+    const { telefono, email, role, curp, perfil_privado } = datos;
     const client = await pool.connect();
+
     try {
         await client.query('BEGIN');
-        const perfilActualizado = await usuarioModel.actualizarPerfil(client, usuario_id, telefono, email, role, curp);
+        // Pasamos perfil_privado al modelo
+        const perfilActualizado = await usuarioModel.actualizarPerfil(client, usuario_id, telefono, email, role, curp, perfil_privado);
         
         if (!perfilActualizado) throw new AppError('Usuario no encontrado', 404);
         

@@ -70,6 +70,17 @@ const obtenerHistorial = async (usuario_id) => {
     return rows;
 };
 
+// NUEVO: Obtener los reportes (públicos) creados o rescatados por un usuario
+const obtenerReportesPorUsuarioId = async (usuario_id) => {
+    const query = `
+        ${_baseSelectQuery}
+        WHERE r.usuario_reportador_id = $1 OR r.usuario_rescatista_id = $1
+        ORDER BY r.id DESC;
+    `;
+    const { rows } = await pool.query(query, [usuario_id]);
+    return rows;
+};
+
 const obtenerReportesActivos = async (limit = 50, offset = 0, usuario_id = null, lat = null, lng = null) => {
     let locationFilter = '';
     let orderClause = 'ORDER BY r.id DESC';
@@ -196,5 +207,6 @@ module.exports = {
     actualizarEstadoReporte, 
     abortarRescate, 
     actualizarProgresoRescate, 
-    finalizarEstadoRescate 
+    finalizarEstadoRescate,
+    obtenerReportesPorUsuarioId // Exportamos el nuevo método
 };

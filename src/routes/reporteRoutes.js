@@ -13,7 +13,8 @@ const {
     obtenerMiRescateActivo, 
     finalizarReporte, 
     abortarReporte, 
-    actualizarProgreso 
+    actualizarProgreso,
+    obtenerReportesUsuarioPublico // Lo importamos aquí
 } = require('../controllers/reporteController');
 
 const { 
@@ -49,6 +50,10 @@ router.post('/', auth, upload.single('foto'), validarCreacionReporte, crearRepor
 router.get('/mis-reportes', auth, obtenerMisReportes);
 router.get('/activos', auth, obtenerReportesActivos);
 router.get('/mi-rescate', auth, obtenerMiRescateActivo);
+
+// NUEVA RUTA PARA PERFILES PÚBLICOS
+router.get('/usuario/:id', auth, obtenerReportesUsuarioPublico);
+
 router.put('/:id/aceptar', auth, aceptarReporte);
 router.put('/:id/abortar', auth, abortarReporte);
 router.put('/:id/progreso', auth, actualizarProgreso);
