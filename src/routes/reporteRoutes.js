@@ -46,7 +46,18 @@ const validarCreacionReporte = [
     }
 ];
 
-router.post('/', auth, upload.single('foto'), validarCreacionReporte, crearReporte);
+const medirInicioSubida = (req, res, next) => {
+    req.tiempoInicioSubida = Date.now();
+    next();
+};
+
+const medirFinSubida = (req, res, next) => {
+    const tiempoTotal = Date.now() - req.tiempoInicioSubida;
+    console.log(`[MÉTRICA POC] Tiempo de subida a Cloudinary: ${tiempoTotal} ms`);
+    next();
+};
+
+router.post('/', auth, medirInicioSubida, upload.single('foto'), medirFinSubida, validarCreacionReporte, crearReporte);
 router.get('/mis-reportes', auth, obtenerMisReportes);
 router.get('/activos', auth, obtenerReportesActivos);
 router.get('/mi-rescate', auth, obtenerMiRescateActivo);
