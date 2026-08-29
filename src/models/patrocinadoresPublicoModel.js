@@ -2,7 +2,7 @@ const pool = require('../config/database');
 
 const listarPatrocinadores = async () => {
     const { rows } = await pool.query(
-        `SELECT id, nombre, direccion, telefono
+        `SELECT id, nombre, direccion, telefono, logo_url, enlace_contacto, tipo_patrocinio, bio
          FROM patrocinadores
          ORDER BY nombre;`
     );
@@ -11,7 +11,7 @@ const listarPatrocinadores = async () => {
 
 const obtenerPatrocinadorPorId = async (patrocinador_id) => {
     const { rows } = await pool.query(
-        `SELECT id, nombre, direccion, telefono
+        `SELECT id, nombre, direccion, telefono, logo_url, enlace_contacto, tipo_patrocinio, bio
          FROM patrocinadores
          WHERE id = $1;`,
         [patrocinador_id]
