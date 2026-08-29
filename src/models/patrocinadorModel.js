@@ -125,6 +125,12 @@ const eliminarItemCatalogo = async (usuario_id, item_id) => {
     return rows[0];
 };
 
+const eliminarLogo = async (usuario_id) => {
+    const query = `UPDATE patrocinadores SET logo_url = NULL WHERE usuario_id = $1 RETURNING *`;
+    const result = await pool.query(query, [usuario_id]);
+    return result.rows[0];
+};
+
 module.exports = {
     obtenerPatrocinadorId,
     obtenerDatosNegocio,
@@ -133,5 +139,6 @@ module.exports = {
     obtenerCatalogo,
     crearItemCatalogo,
     actualizarItemCatalogo,
-    eliminarItemCatalogo
+    eliminarItemCatalogo,
+    eliminarLogo
 };
