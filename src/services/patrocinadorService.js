@@ -73,6 +73,10 @@ const eliminarItemCatalogo = async (usuario_id, item_id) => {
     return await patrocinadorModel.eliminarItemCatalogo(usuario_id, item_id);
 };
 
+const eliminarLogo = async (usuario_id) => {
+    return await patrocinadorModel.eliminarLogo(usuario_id);
+};
+
 module.exports = {
     obtenerDatosNegocio,
     actualizarDatosNegocio,
@@ -80,5 +84,6 @@ module.exports = {
     obtenerCatalogo,
     crearItemCatalogo,
     actualizarItemCatalogo,
-    eliminarItemCatalogo
+    eliminarItemCatalogo,
+    eliminarLogo
 };
