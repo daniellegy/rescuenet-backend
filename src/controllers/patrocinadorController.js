@@ -77,6 +77,15 @@ const eliminarItemCatalogo = async (req, res) => {
     }
 };
 
+const eliminarLogo = async (req, res, next) => {
+    try {
+        await patrocinadorService.eliminarLogo(req.usuario.id);
+        res.json({ message: 'Logo eliminado correctamente' });
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     obtenerConfiguracion,
     guardarConfiguracion,
@@ -84,5 +93,6 @@ module.exports = {
     obtenerCatalogo,
     crearItemCatalogo,
     actualizarItemCatalogo,
-    eliminarItemCatalogo
+    eliminarItemCatalogo,
+    eliminarLogo
 };
