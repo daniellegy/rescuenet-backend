@@ -12,10 +12,9 @@ module.exports = async function(req, res, next) {
     const token = authHeader.replace('Bearer ', '');
     
     try {
-        // 1. Verificar la firma y expiración del token
+        // Verificar la firma y expiración del token
         const cifrado = jwt.verify(token, process.env.JWT_SECRET);
         
-        // 2. VALIDACIÓN DE SEGURIDAD: Verificar estado en la base de datos
         // Extraemos el id del usuario contenido en el payload
         const query = 'SELECT activo FROM usuarios WHERE id = $1';
         const { rows } = await pool.query(query, [cifrado.usuario.id]);
@@ -25,7 +24,7 @@ module.exports = async function(req, res, next) {
             return res.status(403).json({ error: 'Acceso denegado. La cuenta ha sido desactivada o eliminada.' });
         }
         
-        // 3. Inyectar los datos del usuario en la petición
+        // Inyectar los datos del usuario en la petición
         req.usuario = cifrado.usuario;
         next();
     } catch (error) {

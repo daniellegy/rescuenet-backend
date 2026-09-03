@@ -4,7 +4,7 @@ const { body, validationResult } = require('express-validator');
 const upload = require('../middlewares/upload');
 const rateLimit = require('express-rate-limit');
 
-// Límite de seguridad para evitar ataques de fuerza bruta
+// Límite de seguridad para evitar ataques en endpoints de autenticación
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
     max: 10, // Limita a 10 intentos fallidos por IP

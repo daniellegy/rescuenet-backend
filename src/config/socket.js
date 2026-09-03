@@ -5,7 +5,7 @@ module.exports = {
         const { Server } = require("socket.io");
         io = new Server(server, {
             cors: {
-                origin: "*", // En producción puedes restringirlo al dominio de tu app
+                origin: "*",
                 methods: ["GET", "POST"]
             }
         });

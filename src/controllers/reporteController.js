@@ -24,7 +24,7 @@ const obtenerMisReportes = async (req, res) => {
     }
 };
 
-// NUEVO: Obtener los reportes de un usuario público con validación de privacidad de backend
+// Obtener los reportes de un usuario público con validación de privacidad de backend
 const obtenerReportesUsuarioPublico = async (req, res) => {
     try {
         const estadisticas = await usuarioModel.obtenerEstadisticasUsuario(req.params.id);
@@ -32,7 +32,7 @@ const obtenerReportesUsuarioPublico = async (req, res) => {
             return res.status(404).json({ error: 'Usuario no encontrado' });
         }
         
-        // Bloqueo de seguridad robusta si se intentó hacer bypass desde el cliente
+        // Bloqueo de seguridad si se intentó hacer bypass desde el cliente
         if (estadisticas.perfil_privado) {
             return res.status(403).json({ error: 'El perfil de este usuario es privado' });
         }
@@ -123,5 +123,5 @@ module.exports = {
     abortarReporte, 
     actualizarProgreso, 
     finalizarReporte,
-    obtenerReportesUsuarioPublico // Exportamos el nuevo controlador
+    obtenerReportesUsuarioPublico
 };

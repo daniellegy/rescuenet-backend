@@ -10,7 +10,7 @@ if (!process.env.DATABASE_URL) {
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
-        rejectUnauthorized: false // Requerido para conexiones serverless cifradas como NeonDB
+        rejectUnauthorized: false // Requerido para conexion serverless NeonDB
     }
 });
 

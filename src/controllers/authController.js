@@ -74,7 +74,7 @@ const eliminarCuenta = async (req, res) => {
     }
 };
 
-// NUEVO: Controlador para subir foto de perfil
+// Controlador para subir foto de perfil
 const actualizarFoto = async (req, res) => {
     try {
         const fotoUrl = await authService.actualizarFotoPerfil(req.usuario.id, req.file);
@@ -88,7 +88,7 @@ const actualizarFoto = async (req, res) => {
     }
 };
 
-// NUEVO: Controlador para las estadísticas públicas
+// Controlador para las estadísticas públicas
 const obtenerEstadisticas = async (req, res) => {
     try {
         const estadisticas = await authService.obtenerEstadisticasUsuario(req.params.id);

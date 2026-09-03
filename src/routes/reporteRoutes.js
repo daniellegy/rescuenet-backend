@@ -14,7 +14,7 @@ const {
     finalizarReporte, 
     abortarReporte, 
     actualizarProgreso,
-    obtenerReportesUsuarioPublico // Lo importamos aquí
+    obtenerReportesUsuarioPublico
 } = require('../controllers/reporteController');
 
 const { 

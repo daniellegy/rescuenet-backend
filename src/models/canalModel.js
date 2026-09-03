@@ -71,7 +71,7 @@ const reactivarCanalSiCorresponde = async (reporte_id) => {
     return rows.length > 0;
 };
 
-// MODIFICACIÓN: Inserción y Join simultáneo para WebSockets
+// Inserción y Join simultáneo para WebSockets
 const crearMensaje = async (reporte_id, autor_id, contenido) => {
     const { rows } = await pool.query(
         `WITH insertado AS (

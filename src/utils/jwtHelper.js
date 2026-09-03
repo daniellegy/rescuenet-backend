@@ -6,7 +6,7 @@ const generarToken = (usuario) => {
         usuario: {
             id: usuario.id,
             rol_id: usuario.rol_id,
-            nombre_completo: usuario.nombre_completo // 🌟 AHORA EL TOKEN LLEVARÁ EL NOMBRE
+            nombre_completo: usuario.nombre_completo // El token lleva el nombre
         }
     };
     

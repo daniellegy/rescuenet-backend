@@ -70,7 +70,7 @@ const obtenerHistorial = async (usuario_id) => {
     return rows;
 };
 
-// NUEVO: Obtener los reportes (públicos) creados o rescatados por un usuario
+// Obtener los reportes (públicos) creados o rescatados por un usuario
 const obtenerReportesPorUsuarioId = async (usuario_id) => {
     const query = `
         ${_baseSelectQuery}
@@ -208,5 +208,5 @@ module.exports = {
     abortarRescate, 
     actualizarProgresoRescate, 
     finalizarEstadoRescate,
-    obtenerReportesPorUsuarioId // Exportamos el nuevo método
+    obtenerReportesPorUsuarioId
 };

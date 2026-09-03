@@ -1,5 +1,5 @@
 const canalService = require('../services/canalService');
-const socketIo = require('../config/socket'); // <--- Importamos la instancia de Socket
+const socketIo = require('../config/socket');
 
 const obtenerEstadoCanal = async (req, res) => {
     try {
@@ -21,10 +21,10 @@ const listarMensajesCanal = async (req, res) => {
 
 const enviarMensajeCanal = async (req, res) => {
     try {
-        // 1. Guardamos el mensaje en la base de datos
+        // Guardamos el mensaje en la base de datos
         const mensaje = await canalService.enviarMensaje(req.params.id, req.usuario.id, req.body.contenido);
         
-        // 2. Emitimos el mensaje en tiempo real a la "sala" del reporte
+        // Emitimos el mensaje en tiempo real a la "sala" del reporte
         socketIo.getIO().to(`canal_${req.params.id}`).emit('nuevo_mensaje', mensaje);
 
         return res.status(201).json(mensaje);

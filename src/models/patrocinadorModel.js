@@ -10,9 +10,6 @@ const obtenerPatrocinadorId = async (usuario_id) => {
         return rows[0].id;
     }
 
-    // No existía perfil de patrocinador para este usuario: lo creamos al vuelo
-    // en vez de fallar. "nombre" es NOT NULL en la tabla, así que le ponemos
-    // un placeholder — el usuario lo puede editar después desde Configuración.
     const { rows: nuevo } = await pool.query(
         `INSERT INTO patrocinadores (usuario_id, nombre)
          VALUES ($1, $2)
@@ -57,7 +54,7 @@ const actualizarItemCatalogo = async (usuario_id, item_id, { nombre, tipo, preci
     );
 
     if (rows.length === 0) {
-        // O no existe ese item, o pertenece a otro patrocinador (intento de acceso indebido)
+        // O no existe ese item, o pertenece a otro patrocinador
         throw { statusCode: 404, message: 'Item no encontrado en tu catálogo' };
     }
     return rows[0];
