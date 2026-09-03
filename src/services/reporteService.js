@@ -2,27 +2,8 @@ const reporteModel = require('../models/reporteModel');
 const usuarioModel = require('../models/usuarioModel');
 const canalModel = require('../models/canalModel');
 const pool = require('../config/database');
-const { initializeApp, cert, getApps } = require('firebase-admin/app');
-const { getMessaging } = require('firebase-admin/messaging');
+const { getFirebaseMessaging } = require('../config/firebase');
 const AppError = require('../utils/AppError');
-
-try {
-    if (getApps().length === 0) {
-        let credentialConfig;
-        if (process.env.FIREBASE_CREDENTIALS) {
-            credentialConfig = cert(JSON.parse(process.env.FIREBASE_CREDENTIALS));
-        } else {
-            const path = require('path');
-            const rutaKey = path.join(process.cwd(), 'firebase-key.json');
-            credentialConfig = cert(require(rutaKey));
-        }
-        
-        initializeApp({ credential: credentialConfig });
-        console.log("Firebase inicializado con éxito.");
-    }
-} catch (error) {
-    console.error("Fallo en la inicialización de Firebase:", error);
-}
 
 const crearNuevoReporte = async (usuario, body, file) => {
     if (!file) throw new AppError('La fotografía es obligatoria', 400);
@@ -74,7 +55,7 @@ const crearNuevoReporte = async (usuario, body, file) => {
             const tokens = await usuarioModel.obtenerTokensVoluntariosCercanos(latitud, longitud);
             if (tokens.length > 0) {
                 const emoji = urgencia === 'alta' ? '🚨' : urgencia === 'media' ? '⚠️' : '🐾';
-                await getMessaging().sendEachForMulticast({
+                await getFirebaseMessaging().sendEachForMulticast({
                     tokens: tokens,
                     notification: {
                         title: `${emoji} Emergencia de Rescate (${urgencia.toUpperCase()})`,
@@ -97,7 +78,6 @@ const obtenerMisReportes = async (usuario_id) => {
     return await reporteModel.obtenerHistorial(usuario_id);
 };
 
-// NUEVO: Invoca el modelo para obtener reportes públicos de un usuario
 const obtenerReportesDeUsuarioPublico = async (usuario_id) => {
     return await reporteModel.obtenerReportesPorUsuarioId(usuario_id);
 };
@@ -143,10 +123,10 @@ const finalizarRescateAsignado = async (reporte_id, voluntario_id, detalles, fil
         `;
         const res = await pool.query(query, [reporte_id]);
         if (res.rows.length > 0) {
-            await getMessaging().send({
+            await getFirebaseMessaging().send({
                 token: res.rows[0].fcm_token,
                 notification: {
-                    title: '✅ ¡Emergencia Resuelta!',
+                    title: '¡Emergencia Resuelta!',
                     body: 'El voluntario ha concluido tu reporte. Revisa la conclusión final.'
                 },
                 data: { reporte_id: String(reporte_id) },
@@ -170,5 +150,5 @@ module.exports = {
     abortarRescateAsignado, 
     actualizarProgreso, 
     finalizarRescateAsignado,
-    obtenerReportesDeUsuarioPublico // Exportar el nuevo método
+    obtenerReportesDeUsuarioPublico
 };
