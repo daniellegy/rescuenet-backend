@@ -19,6 +19,53 @@ const obtenerPatrocinadorId = async (usuario_id) => {
     return nuevo[0].id;
 };
 
+// Trae nombre, dirección, teléfono, logo y los datos de perfil público del negocio
+const obtenerDatosNegocio = async (usuario_id) => {
+    const patrocinador_id = await obtenerPatrocinadorId(usuario_id);
+    const { rows } = await pool.query(
+        `SELECT nombre, direccion, telefono, logo_url, enlace_contacto, tipo_patrocinio, bio
+         FROM patrocinadores
+         WHERE id = $1;`,
+        [patrocinador_id]
+    );
+    return rows[0] || null;
+};
+
+// Actualiza nombre, dirección, teléfono y los datos de perfil público del negocio.
+// Como obtenerPatrocinadorId ya garantiza que la fila existe (la crea si falta),
+// acá solo hace falta un UPDATE, no un upsert manual.
+const actualizarDatosNegocio = async (usuario_id, { nombre, direccion, telefono, enlace_contacto, tipo_patrocinio, bio }) => {
+    const patrocinador_id = await obtenerPatrocinadorId(usuario_id);
+    const { rows } = await pool.query(
+        `UPDATE patrocinadores
+         SET nombre = $1,
+             direccion = $2,
+             telefono = $3,
+             enlace_contacto = $4,
+             tipo_patrocinio = $5,
+             bio = $6,
+             actualizado_el = CURRENT_TIMESTAMP
+         WHERE id = $7
+         RETURNING nombre, direccion, telefono, logo_url, enlace_contacto, tipo_patrocinio, bio;`,
+        [nombre, direccion, telefono, enlace_contacto || null, tipo_patrocinio || null, bio || null, patrocinador_id]
+    );
+    return rows[0];
+};
+
+// Actualiza solo el logo_url del patrocinador
+const actualizarLogo = async (usuario_id, logo_url) => {
+    const patrocinador_id = await obtenerPatrocinadorId(usuario_id);
+    const { rows } = await pool.query(
+        `UPDATE patrocinadores
+         SET logo_url = $1,
+             actualizado_el = CURRENT_TIMESTAMP
+         WHERE id = $2
+         RETURNING logo_url;`,
+        [logo_url, patrocinador_id]
+    );
+    return rows[0];
+};
+
 const obtenerCatalogo = async (usuario_id) => {
     const patrocinador_id = await obtenerPatrocinadorId(usuario_id);
     const { rows } = await pool.query(
@@ -75,10 +122,20 @@ const eliminarItemCatalogo = async (usuario_id, item_id) => {
     return rows[0];
 };
 
+const eliminarLogo = async (usuario_id) => {
+    const query = `UPDATE patrocinadores SET logo_url = NULL WHERE usuario_id = $1 RETURNING *`;
+    const result = await pool.query(query, [usuario_id]);
+    return result.rows[0];
+};
+
 module.exports = {
     obtenerPatrocinadorId,
+    obtenerDatosNegocio,
+    actualizarDatosNegocio,
+    actualizarLogo,
     obtenerCatalogo,
     crearItemCatalogo,
     actualizarItemCatalogo,
-    eliminarItemCatalogo
+    eliminarItemCatalogo,
+    eliminarLogo
 };

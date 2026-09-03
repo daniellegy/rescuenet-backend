@@ -29,6 +29,9 @@ const authMiddleware = require('../middlewares/auth');
 const validarCampos = (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+        console.log("--- ERRORES DETECTADOS POR EXPRESS-VALIDATOR ---");
+        console.log("Body recibido:", req.body);
+        console.log("Errores:", errors.array());
         return res.status(400).json({ error: 'Datos de entrada inválidos', detalles: errors.array() });
     }
     next();
@@ -39,7 +42,7 @@ const validacionRegistro = [
     body('telefono').notEmpty().withMessage('El teléfono es obligatorio').matches(/^[0-9\-()+\s]{10,15}$/).withMessage('Formato de teléfono inválido'),
     body('email').isEmail().withMessage('Formato de correo inválido'),
     body('password').notEmpty().withMessage('La contraseña es obligatoria').isLength({ min: 6 }).withMessage('La contraseña debe tener al menos 6 caracteres'),
-    body('rol_id').isIn([1, 2]).withMessage('Rol inválido'),
+    body('rol_id').customSanitizer(value => String(value)).isIn(['1', '2', '3']).withMessage('Rol inválido'),
     body('curp')
         .if(body('rol_id').equals('2'))
         .matches(/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z\d]\d$/).withMessage('El CURP proporcionado no tiene un formato válido.'),
@@ -57,7 +60,7 @@ const validacionActualizarPerfil = [
     body('email').optional().isEmail().withMessage('Formato de correo inválido'),
     body('role').optional().isIn([1, 2]).withMessage('Acción denegada. Rol inválido.'),
     body('curp').optional().matches(/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z\d]\d$/).withMessage('El formato del CURP proporcionado es inválido.'),
-    body('perfil_privado').optional().isBoolean().withMessage('El valor de privacidad debe ser booleano.'), // <-- NUEVO
+    body('perfil_privado').optional().isBoolean().withMessage('El valor de privacidad debe ser booleano.'),
     validarCampos
 ];
 
